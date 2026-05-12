@@ -1,0 +1,263 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "last_verified_date": "2025-05-12",
+    "verified_by": "Engineering — sourced from eCFR 27 CFR Parts 4, 5, 7, 16",
+    "notes": "This file is the single source of truth for all TTB regulatory rules used in verification. Update this file when regulations change. Commit every change to CHANGELOG.md with the CFR citation for the change."
+  },
+
+  "government_warning": {
+    "citation": "27 CFR Part 16 — Alcoholic Beverage Health Warning Statement",
+    "statute": "Alcoholic Beverage Labeling Act (ABLA) of 1988, 27 U.S.C. 215",
+    "applies_to": "All alcoholic beverages containing 0.5% ABV or more, domestic and imported",
+    "exact_text": "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.",
+    "formatting_rules": {
+      "government_warning_label_caps_bold": {
+        "requirement": "The words 'GOVERNMENT WARNING:' must appear in ALL CAPS and in bold type",
+        "citation": "27 CFR § 16.22(a)(2)"
+      },
+      "remainder_not_bold": {
+        "requirement": "The remainder of the warning statement after 'GOVERNMENT WARNING:' must NOT appear in bold type",
+        "citation": "27 CFR § 16.22(a)(2)"
+      },
+      "contrasting_background": {
+        "requirement": "Must appear on a contrasting background",
+        "citation": "27 CFR § 16.22(a)(1)"
+      },
+      "readily_legible": {
+        "requirement": "Must be readily legible under ordinary conditions",
+        "citation": "27 CFR § 16.22(a)(1)"
+      },
+      "separate_and_apart": {
+        "requirement": "Must appear separate and apart from all other information on the label",
+        "citation": "27 CFR § 16.21"
+      },
+      "continuous_statement": {
+        "requirement": "Must appear as a continuous statement — cannot be split across label panels",
+        "citation": "27 CFR § 16.22"
+      },
+      "minimum_font_size": {
+        "containers_237ml_or_less": "1mm minimum",
+        "containers_above_237ml_up_to_3L": "2mm minimum",
+        "containers_above_3L": "3mm minimum",
+        "citation": "27 CFR § 16.22(b)"
+      }
+    },
+    "verification_checks": [
+      "government_warning_present",
+      "government_warning_verbatim",
+      "government_warning_caps_bold",
+      "government_warning_not_bold_remainder",
+      "government_warning_legible",
+      "government_warning_separate"
+    ]
+  },
+
+  "beverage_types": {
+
+    "distilled_spirits": {
+      "citation": "27 CFR Part 5 — Labeling and Advertising of Distilled Spirits",
+      "effective_date": "February 9, 2022 (T.D. TTB-176)",
+      "mandatory_fields": [
+        {
+          "field": "brand_name",
+          "label": "Brand Name",
+          "citation": "27 CFR § 5.61",
+          "requirement": "Must appear on the label. Must not be misleading.",
+          "conditional": null,
+          "fuzzy_match_policy": "Always flag any difference including case, punctuation, spacing, abbreviation. Agent decides."
+        },
+        {
+          "field": "class_type",
+          "label": "Class and Type Designation",
+          "citation": "27 CFR § 5.62",
+          "requirement": "Must conform to the standards of identity in 27 CFR Part 5 Subpart C.",
+          "conditional": null,
+          "fuzzy_match_policy": "Always flag any difference. Abbreviations of class/type must be flagged."
+        },
+        {
+          "field": "abv",
+          "label": "Alcohol Content",
+          "citation": "27 CFR § 5.65",
+          "requirement": "Must be expressed as a percentage of alcohol by volume (% alc/vol). Proof is optional but if present must appear in the same field of vision as the mandatory ABV statement. Proof-only without ABV percentage is non-compliant.",
+          "conditional": null,
+          "acceptable_formats": [
+            "45% Alc./Vol.",
+            "45% Alc/Vol",
+            "45% Alc./Vol. (90 Proof)",
+            "45% alcohol by volume"
+          ],
+          "non_compliant_formats": [
+            "90 Proof (without ABV percentage)"
+          ],
+          "match_logic": "Match on numeric value. Flag format differences with a note. Flag proof-only as non-compliant.",
+          "tolerance": "Per 27 CFR § 5.65, standard regulatory tolerances apply to stated vs actual ABV"
+        },
+        {
+          "field": "net_contents",
+          "label": "Net Contents",
+          "citation": "27 CFR § 5.66",
+          "requirement": "Must appear on the label in metric measure.",
+          "conditional": null,
+          "fuzzy_match_policy": "Flag numeric differences. Flag unit differences (mL vs ml is acceptable variation, but flag for agent awareness)."
+        },
+        {
+          "field": "bottler_name_address",
+          "label": "Name and Address of Bottler",
+          "citation": "27 CFR § 5.63",
+          "requirement": "Name and address of the bottler or importer must appear on the label.",
+          "conditional": null,
+          "fuzzy_match_policy": "Flag any difference. Address abbreviations (St. vs Street) flagged with note."
+        },
+        {
+          "field": "country_of_origin",
+          "label": "Country of Origin",
+          "citation": "27 CFR § 5.64",
+          "requirement": "Required for imported distilled spirits. Must identify the country of origin.",
+          "conditional": "is_import",
+          "conditional_note": "Only required when is_import = true. Skip check for domestic products.",
+          "fuzzy_match_policy": "Flag any difference."
+        }
+      ]
+    },
+
+    "wine": {
+      "citation": "27 CFR Part 4 — Labeling and Advertising of Wine",
+      "effective_date": "April 2, 2020 (T.D. TTB-158), amended November 6, 2024 (T.D. TTB-196)",
+      "mandatory_fields": [
+        {
+          "field": "brand_name",
+          "label": "Brand Name",
+          "citation": "27 CFR § 4.32",
+          "requirement": "Must appear on the brand label. Must not be misleading.",
+          "conditional": null,
+          "fuzzy_match_policy": "Always flag any difference including case, punctuation, spacing. Agent decides."
+        },
+        {
+          "field": "class_type",
+          "label": "Class, Type, or Varietal Designation",
+          "citation": "27 CFR § 4.33",
+          "requirement": "Must state the class of wine per 27 CFR Part 4 Subpart C, or a permitted varietal, semigeneric geographic, or geographic distinctive designation.",
+          "conditional": null,
+          "fuzzy_match_policy": "Always flag any difference."
+        },
+        {
+          "field": "abv",
+          "label": "Alcohol Content",
+          "citation": "27 CFR § 4.36",
+          "requirement": "For wines containing more than 14% ABV, alcohol content must be stated as a percentage of alcohol by volume. Wines 14% or under may state 'table wine' or 'light wine' in lieu of the percentage. For wines above 24% ABV, product is classified as distilled spirits.",
+          "conditional": null,
+          "match_logic": "Match on numeric value where stated. Note 'table wine' / 'light wine' alternatives for wines ≤14% ABV.",
+          "fuzzy_match_policy": "Flag numeric differences. Note format variations."
+        },
+        {
+          "field": "net_contents",
+          "label": "Net Contents",
+          "citation": "27 CFR § 4.37",
+          "requirement": "Must appear on the label.",
+          "conditional": null,
+          "fuzzy_match_policy": "Flag numeric differences."
+        },
+        {
+          "field": "bottler_name_address",
+          "label": "Name and Address of Bottler or Packer",
+          "citation": "27 CFR § 4.35",
+          "requirement": "Name and address of the bottler, packer, or importer must appear.",
+          "conditional": null,
+          "fuzzy_match_policy": "Flag any difference."
+        },
+        {
+          "field": "country_of_origin",
+          "label": "Country of Origin",
+          "citation": "27 CFR § 4.35",
+          "requirement": "Required for imported wines.",
+          "conditional": "is_import",
+          "conditional_note": "Only required when is_import = true.",
+          "fuzzy_match_policy": "Flag any difference."
+        }
+      ]
+    },
+
+    "malt_beverage": {
+      "citation": "27 CFR Part 7 — Labeling and Advertising of Malt Beverages",
+      "effective_date": "February 9, 2022 (T.D. TTB-176)",
+      "mandatory_fields": [
+        {
+          "field": "brand_name",
+          "label": "Brand Name",
+          "citation": "27 CFR § 7.61",
+          "requirement": "Must appear on the label. Must not be misleading.",
+          "conditional": null,
+          "fuzzy_match_policy": "Always flag any difference including case, punctuation, spacing. Agent decides."
+        },
+        {
+          "field": "class_type",
+          "label": "Class and Type Designation",
+          "citation": "27 CFR § 7.62",
+          "requirement": "Must appear on the label per standards in 27 CFR Part 7 Subpart C.",
+          "conditional": null,
+          "fuzzy_match_policy": "Always flag any difference."
+        },
+        {
+          "field": "abv",
+          "label": "Alcohol Content",
+          "citation": "27 CFR § 7.65",
+          "requirement": "Alcohol content statement is required if the malt beverage label makes any alcohol content representation. If stated, must be as a percentage of alcohol by volume.",
+          "conditional": null,
+          "match_logic": "If ABV is present in application data, verify it appears on label and matches. If not stated in application, check label for any alcohol representation.",
+          "fuzzy_match_policy": "Flag numeric differences."
+        },
+        {
+          "field": "net_contents",
+          "label": "Net Contents",
+          "citation": "27 CFR § 7.66",
+          "requirement": "Must appear on the label.",
+          "conditional": null,
+          "fuzzy_match_policy": "Flag numeric differences."
+        },
+        {
+          "field": "bottler_name_address",
+          "label": "Name and Address of Brewer or Packer",
+          "citation": "27 CFR § 7.63",
+          "requirement": "Name and address of the brewer, packer, or importer must appear.",
+          "conditional": null,
+          "fuzzy_match_policy": "Flag any difference."
+        },
+        {
+          "field": "country_of_origin",
+          "label": "Country of Origin",
+          "citation": "27 CFR § 7.64",
+          "requirement": "Required for imported malt beverages.",
+          "conditional": "is_import",
+          "conditional_note": "Only required when is_import = true.",
+          "fuzzy_match_policy": "Flag any difference."
+        }
+      ]
+    }
+  },
+
+  "verification_policy": {
+    "fuzzy_match_global_policy": "All fuzzy matches are flagged — never auto-passed. The flag note describes the specific discrepancy. The human agent makes the final determination. This applies to all fields across all beverage types.",
+    "confidence_thresholds": {
+      "high": { "min": 0.90, "max": 1.00, "label": "High Confidence", "description": "Field clearly readable, unambiguous match or mismatch" },
+      "medium": { "min": 0.70, "max": 0.89, "label": "Medium Confidence", "description": "Field readable with minor uncertainty" },
+      "low": { "min": 0.50, "max": 0.69, "label": "Low Confidence", "description": "Field partially obscured or ambiguous — flag for review" },
+      "unable": { "min": 0.00, "max": 0.49, "label": "Unable to Verify", "description": "Field cannot be reliably read — manual review required" }
+    },
+    "status_definitions": {
+      "pass": "Field on label matches application value within acceptable parameters and meets TTB requirements",
+      "flag": "Discrepancy detected between label and application, OR TTB compliance issue detected. Agent review required.",
+      "unable_to_verify": "Image quality insufficient to reliably verify this field. This is an image problem, not a label compliance problem. Agent should request a better image."
+    },
+    "overall_status_logic": {
+      "pass": "All fields pass AND all compliance checks pass AND all confidence scores are high",
+      "flag_for_review": "Any field is flagged OR any compliance check fails OR any field is unable_to_verify"
+    },
+    "output_language": {
+      "overall_pass": "No Issues Detected — Ready for Agent Sign-Off",
+      "overall_flag": "Fields Flagged — Agent Review Required",
+      "prohibited_terms": ["APPROVED", "REJECTED", "DENIED", "ACCEPTED"],
+      "required_disclaimer": "This result is a verification assist. Final compliance determination is the responsibility of the TTB compliance agent."
+    }
+  }
+}
