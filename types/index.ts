@@ -68,7 +68,7 @@ export interface Submission {
   submitted_at:    string;        // ISO 8601
   status:          'pending' | 'reviewed';
   fields:          ApplicationFields;
-  images:          string[];      // base64 encoded
+  images:          string[];      // Vercel Blob public URLs
   image_mimetypes: string[];      // parallel array to images
 }
 

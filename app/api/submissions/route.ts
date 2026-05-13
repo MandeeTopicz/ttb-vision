@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { put } from '@vercel/blob';
 import { ApplicationFieldsSchema } from '@/lib/schemas';
 import { getAllSubmissions, setSubmission } from '@/lib/store';
 import type { SubmissionListItem } from '@/types';
@@ -71,10 +72,12 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  const images: string[] = [];
+  const id = crypto.randomUUID();
+  const image_urls: string[] = [];
   const image_mimetypes: string[] = [];
 
-  for (const entry of imageEntries) {
+  for (let i = 0; i < imageEntries.length; i++) {
+    const entry = imageEntries[i];
     if (!(entry instanceof File)) {
       return Response.json(
         { error: 'Each image entry must be a file upload', code: 'VALIDATION_ERROR', fields: ['images'] },
@@ -93,12 +96,16 @@ export async function POST(request: NextRequest): Promise<Response> {
         { status: 400 }
       );
     }
-    const buf = Buffer.from(await entry.arrayBuffer());
-    images.push(buf.toString('base64'));
+
+    const ext = entry.type === 'image/png' ? 'png' : 'jpg';
+    const { url } = await put(`submissions/${id}/image-${i + 1}.${ext}`, entry, {
+      access: 'public',
+      contentType: entry.type,
+    });
+    image_urls.push(url);
     image_mimetypes.push(entry.type);
   }
 
-  const id = crypto.randomUUID();
   const submitted_at = new Date().toISOString();
 
   await setSubmission({
@@ -106,7 +113,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     submitted_at,
     status: 'pending',
     fields: fieldsResult.data,
-    images,
+    images: image_urls,
     image_mimetypes,
   });
 

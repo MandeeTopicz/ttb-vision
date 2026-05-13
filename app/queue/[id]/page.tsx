@@ -39,14 +39,9 @@ const ERROR_GUIDANCE: Record<ErrorCode, string> = {
   TIMEOUT: 'The verification timed out. Please retry — if the problem persists, proceed with manual review.',
 };
 
-function base64ToFile(base64: string, mimeType: string, index: number): File {
-  const byteString = atob(base64);
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-  const blob = new Blob([ab], { type: mimeType });
+async function blobUrlToFile(url: string, mimeType: string, index: number): Promise<File> {
+  const res = await fetch(url);
+  const blob = await res.blob();
   const ext = mimeType === 'image/png' ? 'png' : 'jpg';
   return new File([blob], `label-${index + 1}.${ext}`, { type: mimeType });
 }
@@ -118,10 +113,10 @@ export default function AgentReviewPage() {
     try {
       const formData = new FormData();
       formData.append('fields', JSON.stringify(submission.fields));
-      submission.images.forEach((b64, i) => {
-        const file = base64ToFile(b64, submission.image_mimetypes[i], i);
-        formData.append('images', file);
-      });
+      const files = await Promise.all(
+        submission.images.map((url, i) => blobUrlToFile(url, submission.image_mimetypes[i], i))
+      );
+      files.forEach((file) => formData.append('images', file));
 
       const res = await fetch('/api/verify', { method: 'POST', body: formData });
       const data = await res.json() as VerificationResponse | ErrorResponse;
@@ -232,11 +227,11 @@ export default function AgentReviewPage() {
                   Label Image{submission.images.length > 1 ? 's' : ''} ({submission.images.length})
                 </h2>
                 <div className="flex flex-col gap-3">
-                  {submission.images.map((b64, i) => (
+                  {submission.images.map((url, i) => (
                     <div key={i} className="rounded-lg border border-border overflow-hidden bg-muted/20">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`data:${submission.image_mimetypes[i]};base64,${b64}`}
+                        src={url}
                         alt={`Label image ${i + 1}`}
                         className="w-full object-contain max-h-80"
                       />
