@@ -19,7 +19,12 @@ export default function SubmitPage() {
     setState({ phase: 'loading' });
     try {
       const res = await fetch('/api/submissions', { method: 'POST', body: formData });
-      const data = await res.json() as { id?: string; error?: string };
+      let data: { id?: string; error?: string } = {};
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON response body (e.g. unhandled server crash)
+      }
       if (!res.ok) {
         setState({ phase: 'error', message: data.error ?? 'Submission failed. Please try again.' });
       } else {

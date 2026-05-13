@@ -98,24 +98,41 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     const ext = entry.type === 'image/png' ? 'png' : 'jpg';
-    const { url } = await put(`submissions/${id}/image-${i + 1}.${ext}`, entry, {
-      access: 'public',
-      contentType: entry.type,
-    });
+    let url: string;
+    try {
+      ({ url } = await put(`submissions/${id}/image-${i + 1}.${ext}`, entry, {
+        access: 'public',
+        contentType: entry.type,
+      }));
+    } catch (err) {
+      console.error('[api/submissions] Blob upload failed:', err);
+      return Response.json(
+        { error: 'Image storage is unavailable. Please try again or contact support.', code: 'AI_UNAVAILABLE' },
+        { status: 503 }
+      );
+    }
     image_urls.push(url);
     image_mimetypes.push(entry.type);
   }
 
   const submitted_at = new Date().toISOString();
 
-  await setSubmission({
-    id,
-    submitted_at,
-    status: 'pending',
-    fields: fieldsResult.data,
-    images: image_urls,
-    image_mimetypes,
-  });
+  try {
+    await setSubmission({
+      id,
+      submitted_at,
+      status: 'pending',
+      fields: fieldsResult.data,
+      images: image_urls,
+      image_mimetypes,
+    });
+  } catch (err) {
+    console.error('[api/submissions] KV write failed:', err);
+    return Response.json(
+      { error: 'Submission queue is unavailable. Please try again or contact support.', code: 'AI_UNAVAILABLE' },
+      { status: 503 }
+    );
+  }
 
   return Response.json({ id, submitted_at, status: 'pending' }, { status: 201 });
 }
