@@ -88,9 +88,9 @@ Browser (React client)
 ### Prototype Queue Storage
 | | |
 |---|---|
-| **Options** | Server-side in-memory Map; external database (Azure SQL, PostgreSQL); Vercel KV |
-| **Choice** | Server-side in-memory `Map` (prototype only) |
-| **Rationale** | A database adds infrastructure complexity that is out of scope for the prototype. The in-memory Map is sufficient to demonstrate the workflow on a persistent Node.js server (`next dev` / `next start`). The known limitation — submissions are lost on restart and do not persist across Vercel serverless invocations — is documented honestly in `README.md § Prototype Limitations`. The production path is Azure SQL Database (FedRAMP authorized) on TTB's existing Azure infrastructure. See `SCALING.md §3`. |
+| **Options** | Server-side in-memory Map; Vercel KV (Redis); external database (Azure SQL, PostgreSQL) |
+| **Choice** | Vercel KV (Redis-based key-value store, built into Vercel) |
+| **Rationale** | An in-memory Map does not persist across Vercel serverless function invocations — each request may hit a different instance with an empty Map, making the queue invisible to agents. A full database (Azure SQL, PostgreSQL) adds infrastructure complexity out of scope for the prototype. Vercel KV is the right fit: it is built into the Vercel platform, requires no separate infrastructure, has a free tier, and persists across serverless invocations. Submissions are stored with a 24-hour TTL, keeping the store clean without manual purging and making the ephemeral nature of the prototype explicit. The production path is Azure SQL Database (FedRAMP authorized) on TTB's existing Azure infrastructure. See `SCALING.md §3`. |
 
 ### Delivery Format
 | | |

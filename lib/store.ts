@@ -1,9 +1,23 @@
+import { kv } from '@vercel/kv';
 import type { Submission } from '@/types';
 
-// Server-side in-memory submission queue.
-// Persists across requests within the same Node.js server process.
-// Resets on server restart and does not persist across Vercel serverless
-// function instances — use Azure SQL for production (see docs/SCALING.md §3).
-const submissions = new Map<string, Submission>();
+// Submissions expire after 24 hours — appropriate for prototype scope.
+// Production uses Azure SQL (see docs/SCALING.md §3).
+const TTL_SECONDS = 86400;
 
-export default submissions;
+const key = (id: string) => `submission:${id}`;
+
+export async function getSubmission(id: string): Promise<Submission | null> {
+  return kv.get<Submission>(key(id));
+}
+
+export async function setSubmission(submission: Submission): Promise<void> {
+  await kv.set(key(submission.id), submission, { ex: TTL_SECONDS });
+}
+
+export async function getAllSubmissions(): Promise<Submission[]> {
+  const keys = await kv.keys('submission:*');
+  if (keys.length === 0) return [];
+  const values = await kv.mget<(Submission | null)[]>(...keys);
+  return values.filter((v): v is Submission => v !== null);
+}

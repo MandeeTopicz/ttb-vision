@@ -60,6 +60,10 @@ PDF or plain text report.
 cp .env.local.example .env.local
 # Add your OPENAI_API_KEY to .env.local
 
+# Enable Vercel KV in your Vercel project dashboard under Storage,
+# then pull the KV environment variables:
+vercel env pull .env.local
+
 npm install
 npm run dev        # http://localhost:3000
 npm test           # unit tests
@@ -106,21 +110,17 @@ OpenAI account's rate limits:
 
 ## Prototype Limitations
 
-### In-memory submission queue
+### Submission queue TTL
 
-The submission queue (`/queue`) is stored in a server-side in-memory `Map`. This means:
+The submission queue is stored in Vercel KV (Redis). Each submission expires automatically
+after **24 hours**. This is intentional for the prototype — the store stays clean without a
+manual purge process, and it is honest about the ephemeral nature of the prototype queue.
 
-- **Submissions persist only within the lifetime of the server process.** They are lost on
-  any server restart, deployment, or crash.
-- **On Vercel's serverless infrastructure, the Map does not persist across function
-  invocations.** Each API request may be handled by a different serverless instance with its
-  own empty Map. This means the queue will not work reliably on the Vercel deployment without
-  a real database.
-- **For local development**, run `npm run dev` or `npm start`. Submissions persist for the
-  lifetime of that Node.js process.
+Submissions that have expired will no longer appear in the agent queue. If a submission is
+needed after 24 hours, the vendor must resubmit.
 
 The production path for the queue is Azure SQL Database (FedRAMP authorized) on TTB's existing
-Azure infrastructure. See `docs/SCALING.md §3` for the complete production data architecture.
+Azure infrastructure, with no TTL and full audit trail. See `docs/SCALING.md §3`.
 
 ### No authentication
 

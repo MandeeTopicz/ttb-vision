@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { ApplicationFieldsSchema } from '@/lib/schemas';
-import submissions from '@/lib/store';
+import { getAllSubmissions, setSubmission } from '@/lib/store';
 import type { SubmissionListItem } from '@/types';
 
 const ACCEPTED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
@@ -8,7 +8,8 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 3;
 
 export async function GET(): Promise<Response> {
-  const list: SubmissionListItem[] = Array.from(submissions.values())
+  const all = await getAllSubmissions();
+  const list: SubmissionListItem[] = all
     .sort((a, b) => b.submitted_at.localeCompare(a.submitted_at))
     .map((s) => ({
       id: s.id,
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const id = crypto.randomUUID();
   const submitted_at = new Date().toISOString();
 
-  submissions.set(id, {
+  await setSubmission({
     id,
     submitted_at,
     status: 'pending',
