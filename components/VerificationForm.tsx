@@ -44,6 +44,7 @@ interface Props {
   onSubmit: (formData: FormData) => void;
   loading: boolean;
   hasExistingResult: boolean;
+  submitLabel?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ function Field({
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function VerificationForm({ onSubmit, loading, hasExistingResult }: Props) {
+export function VerificationForm({ onSubmit, loading, hasExistingResult, submitLabel = 'Verify Label' }: Props) {
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [attempted, setAttempted] = useState(false);
@@ -420,7 +421,7 @@ export function VerificationForm({ onSubmit, loading, hasExistingResult }: Props
         disabled={loading}
         className="w-full sm:w-auto"
       >
-        {loading ? 'Verifying…' : 'Verify Label'}
+        {loading ? 'Submitting…' : submitLabel}
       </Button>
     </form>
   );

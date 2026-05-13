@@ -61,6 +61,25 @@ export type ErrorCode =
   | 'RESPONSE_INVALID'
   | 'TIMEOUT';
 
+// Submission queue types (three-party workflow)
+
+export interface Submission {
+  id:              string;        // UUID v4
+  submitted_at:    string;        // ISO 8601
+  status:          'pending' | 'reviewed';
+  fields:          ApplicationFields;
+  images:          string[];      // base64 encoded
+  image_mimetypes: string[];      // parallel array to images
+}
+
+export interface SubmissionListItem {
+  id:            string;
+  submitted_at:  string;
+  status:        'pending' | 'reviewed';
+  brand_name:    string;
+  beverage_type: ApplicationFields['beverage_type'];
+}
+
 // Batch types
 
 export interface BatchRow extends ApplicationFields {

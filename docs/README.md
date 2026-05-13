@@ -6,23 +6,51 @@ AI-powered alcohol label verification assistant for TTB compliance agents.
 
 ## Contents
 
-- [Overview](#overview)
+- [Workflow](#workflow)
+- [Routes](#routes)
 - [Getting Started](#getting-started)
 - [Batch Processing](#batch-processing)
+- [Prototype Limitations](#prototype-limitations)
 - [Latency Benchmark Results](#latency-benchmark-results)
 - [Environment Variables](#environment-variables)
 
 ---
 
-## Overview
+## Workflow
 
-TTB Vision cross-references COLA application field data against uploaded label images and
-independently checks TTB regulatory compliance. It is a **verification assist only** — it
-never auto-approves or auto-rejects. Final compliance determination is always made by the
-human TTB compliance agent.
+TTB Vision implements a three-party workflow that mirrors the real TTB label submission process.
 
-Supported beverage types: Distilled Spirits (27 CFR Part 5), Wine (27 CFR Part 4),
-Malt Beverages (27 CFR Part 7).
+### Party 1 — Vendor (submits)
+
+The vendor navigates to `/submit`, fills out their COLA application fields, and uploads their
+label image(s). On submit, they see a confirmation message and a reference ID. They never see
+AI verification results, pass/fail status, or any compliance findings.
+
+### Party 2 — Queue (holds)
+
+The submission is received and held in the server-side queue. AI verification does **not** run
+automatically on submission. The submission sits in `pending` status until an agent reviews it.
+
+### Party 3 — Agent (reviews and triggers)
+
+The agent navigates to `/queue` and sees a table of pending and reviewed submissions. They select
+a submission to open `/queue/[id]`, where they see the vendor's submitted data and label image
+side by side. The agent clicks **Run Verification** — this is when the AI call fires. Only the
+agent sees the AI results. The vendor has no route or view that shows AI output at any point.
+After verification runs, the submission status updates to `reviewed`. The agent can export a
+PDF or plain text report.
+
+---
+
+## Routes
+
+| Route | Party | Purpose |
+|---|---|---|
+| `/` | All | Landing page — links to the three entry points |
+| `/submit` | Vendor | Submit COLA application fields and label images |
+| `/queue` | Agent | List of all pending and reviewed submissions |
+| `/queue/[id]` | Agent | Review submission, run AI verification, export report |
+| `/batch` | Importer | Submit CSV + ZIP for bulk label verification |
 
 ---
 
@@ -42,13 +70,9 @@ npm run bench      # latency benchmark (requires OPENAI_API_KEY)
 
 ## Batch Processing
 
-### How it works
-
-1. Prepare a CSV manifest with one row per label and a ZIP archive of all label images.
-2. Upload both files on the Batch Verification page (`/batch`).
-3. The server validates the CSV pre-flight, extracts the ZIP, and streams results back
-   via Server-Sent Events (SSE) as each label is verified in real time.
-4. Download a PDF report or copy plain text when the batch completes.
+Large importers can use the batch flow at `/batch`. Upload a CSV manifest and a ZIP of label
+images. The server validates the CSV pre-flight, extracts the ZIP, and streams results back
+via Server-Sent Events (SSE) as each label is verified in real time.
 
 ### CSV format
 
@@ -78,12 +102,30 @@ OpenAI account's rate limits:
 | **Tier 2** | **5,000 RPM** | **Recommended for 200–300+ label batches** |
 | Tier 3+ | 10,000+ RPM | Large-scale batch runs |
 
-**Recommendation:** Upgrade to **OpenAI Tier 2 or higher** before running batches of
-200+ labels. On Tier 1, the application will still complete the batch but may experience
-retry delays on 429 rate-limit responses (the verify service retries automatically with
-exponential backoff).
+---
 
-To check your current tier: [platform.openai.com/settings/organization/limits](https://platform.openai.com/settings/organization/limits)
+## Prototype Limitations
+
+### In-memory submission queue
+
+The submission queue (`/queue`) is stored in a server-side in-memory `Map`. This means:
+
+- **Submissions persist only within the lifetime of the server process.** They are lost on
+  any server restart, deployment, or crash.
+- **On Vercel's serverless infrastructure, the Map does not persist across function
+  invocations.** Each API request may be handled by a different serverless instance with its
+  own empty Map. This means the queue will not work reliably on the Vercel deployment without
+  a real database.
+- **For local development**, run `npm run dev` or `npm start`. Submissions persist for the
+  lifetime of that Node.js process.
+
+The production path for the queue is Azure SQL Database (FedRAMP authorized) on TTB's existing
+Azure infrastructure. See `docs/SCALING.md §3` for the complete production data architecture.
+
+### No authentication
+
+The prototype has no authentication. Any user who has the URL can access any route, including
+the agent queue. Production requires SSO/Active Directory integration. See `docs/SCALING.md §2`.
 
 ---
 

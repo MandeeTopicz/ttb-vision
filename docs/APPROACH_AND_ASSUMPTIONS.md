@@ -11,8 +11,25 @@ TTB Vision is a single-codebase, single-deployment Next.js application. There is
 ```
 Browser (React client)
   │
-  ├── GET /                    → app/page.tsx (single label UI)
-  ├── GET /batch               → app/batch/page.tsx (batch UI)
+  ├── GET /                    → app/page.tsx (landing page)
+  ├── GET /submit              → app/submit/page.tsx (vendor submission form)
+  ├── GET /queue               → app/queue/page.tsx (agent queue list)
+  ├── GET /queue/[id]          → app/queue/[id]/page.tsx (agent review + AI trigger)
+  ├── GET /batch               → app/batch/page.tsx (importer batch UI)
+  │
+  ├── POST /api/submissions    → app/api/submissions/route.ts
+  │     ├── Validates multipart form data (fields JSON + image files)
+  │     ├── Stores submission in server-side Map (lib/store.ts)
+  │     └── Returns { id, submitted_at, status: 'pending' } (201)
+  │
+  ├── GET  /api/submissions    → app/api/submissions/route.ts
+  │     └── Returns SubmissionListItem[] sorted by submitted_at desc
+  │
+  ├── GET  /api/submissions/[id] → app/api/submissions/[id]/route.ts
+  │     └── Returns full Submission record including base64 images
+  │
+  ├── PATCH /api/submissions/[id] → app/api/submissions/[id]/route.ts
+  │     └── Updates submission status to 'reviewed'
   │
   ├── POST /api/verify         → app/api/verify/route.ts
   │     ├── Validates multipart form data (fields JSON + image files)
@@ -29,17 +46,27 @@ Browser (React client)
         └── Streams SSE: progress events per label, then complete event
 ```
 
-### Full Data Flow — Single Label Verification
+### Full Data Flow — Three-Party Workflow
 
-1. **Agent fills form** — `VerificationForm` collects all application fields and up to 3 label images. Client-side validation runs on blur and submit.
-2. **Client submits** — `FormData` is `POST`ed to `/api/verify` with `fields` (JSON string) and `images` (file uploads).
-3. **API route validates** — `ApplicationFieldsSchema` (Zod) parses the fields JSON. Image files are checked for MIME type (JPEG/PNG only) and size (≤ 10 MB each, max 3).
-4. **Ruleset loaded** — `getRuleset(beverage_type)` reads `config/ttb_rules.json` and returns the correct mandatory-fields list. Ruleset is never inferred from the label — it is always driven by the `beverage_type` field.
-5. **Prompt constructed** — `buildSystemPrompt()` embeds the government warning rules, mandatory fields for the selected beverage type, fuzzy match policy, and confidence scoring definitions. `buildUserMessage()` wraps all agent-supplied field values in XML tags and appends base64-encoded images.
-6. **GPT-4o called** — `verify()` sends the system prompt and user message to OpenAI's chat completions endpoint with `response_format: { type: 'json_object' }`. Rate-limit errors are retried with exponential backoff (1 s, 2 s, 4 s, max 3 retries). Timeout errors surface as `TIMEOUT`.
-7. **Zod validation** — The raw JSON string from GPT-4o is parsed and validated against `VerificationResponseSchema`. If validation fails, a `RESPONSE_INVALID` error is returned. Partial results are never rendered.
-8. **Results rendered** — `ResultsPanel` shows the overall status banner, per-field results table with confidence bars, and TTB compliance checks.
-9. **Report exported** — `ReportExport` generates a PDF (via `@react-pdf/renderer`, client-side) or copies plain text to clipboard. Every export includes the agent disclaimer.
+**Vendor submission (`/submit` → `POST /api/submissions`):**
+
+1. **Vendor fills form** — `VerificationForm` collects all application fields and up to 3 label images. Client-side validation runs on blur and submit.
+2. **Client submits** — `FormData` is `POST`ed to `/api/submissions` with `fields` (JSON string) and `images` (file uploads).
+3. **API route validates** — `ApplicationFieldsSchema` (Zod) parses the fields. Images are validated for MIME type and size. Images are base64-encoded and stored in the server-side Map (`lib/store.ts`) with a UUID key.
+4. **Vendor sees confirmation only** — The response is `{ id, submitted_at, status: 'pending' }`. The vendor's browser shows a confirmation message. No AI output, no pass/fail, no compliance findings are returned to the vendor at any point.
+
+**Agent review (`/queue` → `/queue/[id]` → `POST /api/verify`):**
+
+5. **Agent opens queue** — `GET /api/submissions` returns all submissions as `SubmissionListItem[]` sorted by date. The agent sees brand name, beverage type, submitted date, and status.
+6. **Agent opens submission** — `GET /api/submissions/[id]` returns the full `Submission` record including stored base64 images. The agent sees the vendor's fields and images side by side. No AI results are shown yet.
+7. **Agent triggers AI** — The agent clicks "Run Verification." The client converts the stored base64 images back to `File` objects, builds a `FormData`, and `POST`s to `/api/verify`.
+8. **Ruleset loaded** — `getRuleset(beverage_type)` reads `config/ttb_rules.json` and returns the correct mandatory-fields list. Ruleset is never inferred from the label — it is always driven by the `beverage_type` field.
+9. **Prompt constructed** — `buildSystemPrompt()` embeds the government warning rules, mandatory fields for the selected beverage type, fuzzy match policy, and confidence scoring definitions. `buildUserMessage()` wraps all vendor-supplied field values in XML tags and appends base64-encoded images.
+10. **GPT-4o called** — `verify()` sends the system prompt and user message to OpenAI. Rate-limit errors are retried with exponential backoff (1 s, 2 s, 4 s, max 3 retries). Timeout errors surface as `TIMEOUT`.
+11. **Zod validation** — The raw JSON string from GPT-4o is validated against `VerificationResponseSchema`. If validation fails, `RESPONSE_INVALID` is returned. Partial results are never rendered.
+12. **Results rendered (agent only)** — `ResultsPanel` shows the overall status banner, per-field results table with confidence bars, and TTB compliance checks. This is visible only on `/queue/[id]`, which the vendor cannot access.
+13. **Status updated** — `PATCH /api/submissions/[id]` marks the submission `reviewed`.
+14. **Report exported** — `ReportExport` generates a PDF or plain text report. Every export includes the agent disclaimer.
 
 ### Why Next.js API Routes
 
@@ -50,6 +77,20 @@ Browser (React client)
 ---
 
 ## Key Technical Decisions
+
+### Who Fills Out the Application Form (Workflow Reframe)
+| | |
+|---|---|
+| **Options** | Agent manually re-enters vendor data from a COLA record; vendor submits their own data directly; COLA system integration (auto-populate from API) |
+| **Choice** | Vendor submits their own data. Agent controls when AI verification runs. |
+| **Rationale** | Agent re-entry of vendor data creates duplicate work and does not solve the efficiency problem — the agent still has to type every field from a paper or PDF application. Vendor self-submission eliminates that entirely. COLA integration is the long-term optimal path but is years away per IT assessment (see `SCALING.md §4`). Vendor direct submission is the correct architecture for the prototype and for an intermediate production deployment. The three-party workflow (vendor submits → queue holds → agent reviews and triggers AI) mirrors the actual TTB submission process and ensures the agent always controls when AI runs. The vendor never sees AI output — compliance findings are visible to agents only. |
+
+### Prototype Queue Storage
+| | |
+|---|---|
+| **Options** | Server-side in-memory Map; external database (Azure SQL, PostgreSQL); Vercel KV |
+| **Choice** | Server-side in-memory `Map` (prototype only) |
+| **Rationale** | A database adds infrastructure complexity that is out of scope for the prototype. The in-memory Map is sufficient to demonstrate the workflow on a persistent Node.js server (`next dev` / `next start`). The known limitation — submissions are lost on restart and do not persist across Vercel serverless invocations — is documented honestly in `README.md § Prototype Limitations`. The production path is Azure SQL Database (FedRAMP authorized) on TTB's existing Azure infrastructure. See `SCALING.md §3`. |
 
 ### Delivery Format
 | | |

@@ -4,6 +4,84 @@ This document describes the path from the current Vercel prototype to a producti
 
 ---
 
+## 0. Production Workflow
+
+The prototype implements a three-party workflow using an in-memory queue. This section
+describes what that workflow looks like in production.
+
+### Vendor Authentication
+
+**Prototype:** No authentication. Any user with the URL can access `/submit`.
+
+**Production:** Vendors authenticate via TTB Online / Pay.gov SSO using their existing TTB
+vendor accounts. No separate registration required. The `/submit` route enforces authentication
+before displaying the form. Each submission is associated with the authenticated vendor's account.
+
+### Agent Authentication
+
+**Prototype:** No authentication. Any user with the URL can access `/queue` and `/queue/[id]`.
+
+**Production:** Agents authenticate via Treasury Active Directory SSO. The `/queue` and
+`/queue/[id]` routes are inaccessible without an active agent session. Agent identity is
+recorded in every verification audit log.
+
+### Submission Queue (Persistence)
+
+**Prototype:** Server-side in-memory `Map`. Resets on restart. Does not persist across
+Vercel serverless invocations.
+
+**Production:** Azure SQL Database (FedRAMP authorized) on TTB's existing Azure infrastructure.
+Every submission is stored as a database record with: submission ID, vendor identity, all
+application fields, image blob storage references, status, submitted timestamp, and reviewed
+timestamp. The queue survives server restarts, deployments, and horizontal scaling.
+
+### Label Image Storage
+
+**Prototype:** Base64-encoded images stored in the server-side Map alongside the submission record.
+
+**Production:** Azure Blob Storage. Images are stored in a private container with access
+controlled by the submission ID. Images are referenced by URL in the database record, not
+embedded inline. Retention policy is applied per the applicable federal records schedule.
+
+### COLA System Integration
+
+**Prototype:** Vendor manually enters application fields in the submission form.
+
+**Production (Year 1–2):** Vendor portal with manual entry as in the prototype, but backed
+by Azure SQL and Azure Blob. No COLA integration yet. This is the first production milestone
+and is achievable without IT changes to the COLA system.
+
+**Production (Year 3+):** COLA API integration via webhook. When a vendor submits a COLA
+application through the existing COLA system, a webhook fires to TTB Vision, which pulls
+the structured application data automatically. The vendor's label image is the only upload
+required — all other fields are populated from the COLA record. This eliminates duplicate
+data entry entirely and is the path toward straight-through processing for clean labels.
+
+### Agent Determination
+
+**Production:** After the agent reviews AI findings and makes a determination, their
+decision (APPROVED or REJECTED in TTB's internal workflow — not in TTB Vision's output
+language) is recorded in the database and synced back to the COLA system. TTB Vision's
+output language remains "No Issues Detected — Ready for Agent Sign-Off" and "Fields Flagged
+— Agent Review Required" — the APPROVED/REJECTED determination lives in COLA, not in TTB Vision.
+
+### Batch Submission (Large Importers)
+
+**Production:** Large importers submit CSV + ZIP via an authenticated API endpoint rather
+than the browser UI. API key authentication tied to their vendor account. Results are
+delivered asynchronously via webhook or email notification. See §6 for the Azure Queue
+architecture.
+
+### Realistic Timeline
+
+| Phase | Timeline | Scope |
+|---|---|---|
+| Prototype | Now | In-memory queue, Vercel, no auth, manual entry |
+| Production v1 | Year 1–2 | Azure SQL + Blob, SSO auth, manual entry, FedRAMP |
+| Production v2 | Year 3+ | COLA API integration, webhook-driven, straight-through processing |
+
+---
+
 ## 1. AI Infrastructure
 
 **Prototype:** OpenAI GPT-4o via the public OpenAI API (api.openai.com).
