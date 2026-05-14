@@ -4,7 +4,7 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
-      bodySizeLimit: '52mb', // raise limit for batch ZIP uploads (default is 1MB)
+      bodySizeLimit: '52mb', // applies to Server Actions only — Route Handlers are capped at 4.5MB by Vercel infrastructure
     },
   },
 };

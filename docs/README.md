@@ -95,10 +95,18 @@ Required columns (order-independent, case-insensitive headers):
 | `image_filename` | string | Must match a file in the ZIP (case-insensitive) |
 | `country_of_origin` | string | Required when `is_import` is `true` |
 
+### ZIP size limit
+
+The ZIP archive must be under **4 MB** on this Vercel deployment. Vercel serverless functions
+have a hard 4.5 MB request-body cap at the infrastructure level; the 4 MB client-side check
+provides a safe margin. Compress label images to under 500 KB each before zipping.
+
+The production path (Azure Functions) does not share this constraint. Large-batch ZIPs should
+use Azure Blob Storage + a queue trigger. See `docs/SCALING.md §4`.
+
 ### Batch size and OpenAI tier requirements
 
-There is no application-level cap on batch size. Batch throughput is bounded only by your
-OpenAI account's rate limits:
+Batch throughput is bounded only by your OpenAI account's rate limits:
 
 | OpenAI Tier | RPM | Practical batch guidance |
 |---|---|---|

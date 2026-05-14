@@ -43,8 +43,8 @@ export function BatchUpload({ onSubmit, loading }: Props) {
     const error =
       !file.name.toLowerCase().endsWith('.zip')
         ? 'File must be a .zip archive'
-        : file.size > 50 * 1024 * 1024
-        ? `File is ${(file.size / 1024 / 1024).toFixed(1)} MB — maximum is 50 MB`
+        : file.size > 4 * 1024 * 1024
+        ? `File is ${(file.size / 1024 / 1024).toFixed(1)} MB — maximum is 4 MB`
         : undefined;
     setZipFile({ file, error });
     if (zipRef.current) zipRef.current.value = '';
@@ -138,8 +138,8 @@ export function BatchUpload({ onSubmit, loading }: Props) {
         <Label>Label Images (ZIP)</Label>
         <p className="text-xs text-muted-foreground">
           ZIP archive containing all label images referenced in the CSV. JPEG and PNG only.
-          Maximum 50 MB. For best performance, compress images to under 500 KB each before
-          adding them to your ZIP — large images significantly increase per-label processing time.
+          Maximum 4 MB. Compress images to under 500 KB each before adding them to your ZIP —
+          large images significantly increase per-label processing time.
         </p>
 
         {zipFile ? (

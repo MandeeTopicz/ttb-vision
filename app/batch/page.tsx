@@ -93,7 +93,7 @@ export default function BatchPage() {
         fields = data.fields;
       } catch {
         if (res.status === 413) {
-          message = 'The uploaded files are too large. Compress your label images to under 500 KB each and reduce the ZIP below 50 MB, then try again.';
+          message = 'The uploaded files are too large. Compress your label images to under 500 KB each and keep the ZIP under 4 MB, then try again.';
         }
       }
       setState({ phase: 'error', message, fields });
