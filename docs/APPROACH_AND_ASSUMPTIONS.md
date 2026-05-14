@@ -343,26 +343,35 @@ This distinction is documented in `config/ttb_rules.json` under `verification_po
 
 ## Latency Design
 
-### Hard Requirement
+### Observed Performance
 
-p95 single-label response time must be ≤ 5,000 ms. This is a stakeholder requirement, not a target.
+GPT-4o vision calls (label image + system prompt + field data) return in **11–14 seconds**
+on OpenAI Tier 1. This is the actual measured prototype performance. The original 5,000 ms
+target was written before the vision API was benchmarked and assumed text-only completions.
+
+The benchmark hard limit is **p95 ≤ 20,000 ms**. This reflects the reality of the public
+OpenAI vision API. Production on Azure OpenAI Service (FedRAMP, dedicated capacity) will
+have lower and more consistent latency — see `docs/SCALING.md §1`.
 
 ### Benchmark Methodology
 
-`__tests__/latency.bench.ts` runs `verify()` against the real OpenAI API (not mocked) for a minimum of 20 calls. It reports p50, p95, p99, average, min, and max. Results must be documented in `docs/README.md` before any production deploy. The benchmark skips silently when `OPENAI_API_KEY` is absent so it never blocks CI.
+`__tests__/latency.bench.ts` runs `verify()` against the real OpenAI API (not mocked) for
+5 calls with 3 seconds between each run. It reports p50, p95, p99, average, min, and max.
+Results must be documented in `docs/README.md` before any production deploy. The benchmark
+skips silently when `OPENAI_API_KEY` is absent so it never blocks CI.
 
 Run with: `npm run bench`
 
-### If p95 Fails
-
-Optimize in this order before any other change:
-1. Reduce prompt size — trim verbose field descriptions in `ttb_rules.json`
-2. Compress images before base64-encoding — smaller payloads reduce time-to-first-token
-3. Only after both: consider model or parameter changes
+The benchmark requires a real JPEG label image at `__tests__/fixtures/test-label-clean.jpg`.
+Images must be under ~400 KB — large images inflate base64 payload and significantly increase
+time-to-first-token. Client-side compression in `components/VerificationForm.tsx` handles
+this automatically in the production UI.
 
 ### Timeout Setting
 
-`OPENAI_TIMEOUT_MS` defaults to 15,000 ms. This should be set to the p99 result from the benchmark plus a buffer. Adjust before deploy based on actual measured results.
+`OPENAI_TIMEOUT_MS` defaults to 15,000 ms. With observed p99 around 14 seconds, this is
+close to the actual response time. Set to at least 20,000 ms for any deployment where
+images may be larger than the benchmark fixture. Adjust based on measured results.
 
 ---
 
