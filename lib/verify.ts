@@ -93,7 +93,14 @@ export async function verify(
         );
       }
 
-      return result.data;
+      return {
+        ...result.data,
+        metadata: {
+          ...result.data.metadata,
+          timestamp: new Date().toISOString(),
+          verification_id: crypto.randomUUID(),
+        },
+      };
     } catch (err) {
       // VerificationErrors are terminal — do not retry
       if (err instanceof VerificationError) throw err;
