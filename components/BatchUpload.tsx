@@ -138,7 +138,8 @@ export function BatchUpload({ onSubmit, loading }: Props) {
         <Label>Label Images (ZIP)</Label>
         <p className="text-xs text-muted-foreground">
           ZIP archive containing all label images referenced in the CSV. JPEG and PNG only.
-          Maximum 50 MB.
+          Maximum 50 MB. For best performance, compress images to under 500 KB each before
+          adding them to your ZIP — large images significantly increase per-label processing time.
         </p>
 
         {zipFile ? (

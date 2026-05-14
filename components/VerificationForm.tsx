@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { compressImage } from '@/lib/compress';
 import type { ApplicationFields } from '@/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -159,28 +160,28 @@ export function VerificationForm({ onSubmit, loading, hasExistingResult, submitL
   // ── Image handlers ──
 
   const validateAndAddFiles = useCallback(
-    (incoming: FileList | null) => {
+    async (incoming: FileList | null) => {
       if (!incoming) return;
 
       const newErrors: string[] = [];
       const toAdd: File[] = [];
       const remaining = MAX_FILES - images.length;
 
-      Array.from(incoming).forEach((file) => {
+      for (const file of Array.from(incoming)) {
         if (toAdd.length >= remaining) {
           newErrors.push(`Maximum ${MAX_FILES} images allowed — extra files ignored.`);
-          return;
+          break;
         }
         if (!ACCEPTED_TYPES.has(file.type)) {
           newErrors.push(`"${file.name}": unsupported format. Accepted: JPEG, PNG.`);
-          return;
+          continue;
         }
         if (file.size > MAX_BYTES) {
           newErrors.push(`"${file.name}": ${(file.size / 1024 / 1024).toFixed(1)} MB exceeds the 10 MB limit.`);
-          return;
+          continue;
         }
-        toAdd.push(file);
-      });
+        toAdd.push(await compressImage(file));
+      }
 
       setImages((prev) => [...prev, ...toAdd]);
       setImageErrors(newErrors);
