@@ -83,14 +83,20 @@ export default function BatchPage() {
       return;
     }
 
-    // Pre-flight errors (4xx) return JSON, not SSE
+    // Pre-flight errors (4xx/5xx) return JSON, but a 413 from Next.js is plain text
     if (!res.ok) {
-      const data = (await res.json()) as ErrorResponse;
-      setState({
-        phase: 'error',
-        message: data.error,
-        fields: data.fields,
-      });
+      let message = 'Batch submission failed. Please try again.';
+      let fields: string[] | undefined;
+      try {
+        const data = (await res.json()) as ErrorResponse;
+        message = data.error;
+        fields = data.fields;
+      } catch {
+        if (res.status === 413) {
+          message = 'The uploaded files are too large. Compress your label images to under 500 KB each and reduce the ZIP below 50 MB, then try again.';
+        }
+      }
+      setState({ phase: 'error', message, fields });
       return;
     }
 
