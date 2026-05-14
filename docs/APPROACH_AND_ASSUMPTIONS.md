@@ -510,3 +510,11 @@ A single batch CSV can contain rows with different `beverage_type` values. The c
 - TTB rules in `config/ttb_rules.json` were verified against the eCFR as of the `last_verified_date` in the `meta` section. The deploying team is responsible for keeping rules current with any Federal Register updates.
 - Formal Section 508 accessibility audit is required before any production deployment. `shadcn/ui` provides a strong baseline (Radix UI ARIA attributes, keyboard navigation) but has not been audited.
 - This tool is a **verification assist only**. It is not a legal compliance determination engine, not a COLA replacement, and not an auto-approver or auto-rejector. Final compliance determination is the responsibility of the TTB compliance agent in every case.
+
+---
+
+## Known Improvements
+
+### Batch testing approach
+
+The current implementation uses CSV + ZIP upload for batch input with manual result review. A more rigorous testing approach would include a `manifest.json` per batch defining expected verification outcomes per label, enabling automated accuracy validation rather than manual review. Recommended for production QA pipeline.
