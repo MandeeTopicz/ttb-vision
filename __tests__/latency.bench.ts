@@ -3,12 +3,18 @@
  *
  * Run with: npm run bench
  * Requires: OPENAI_API_KEY set in environment (or .env.local loaded externally)
+ * Requires: __tests__/fixtures/test-label-clean.jpg — a real JPEG label image
  *
  * Skips silently when OPENAI_API_KEY is absent so CI never fails.
  * Hard requirement: p95 ≤ 5000ms.
+ *
+ * A 500ms inter-run delay is applied to stay within OpenAI Tier 1 token limits
+ * (30,000 TPM). This does not affect individual call latency measurements.
  */
 
 import { describe, it, expect } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import { verify } from '@/lib/verify';
 import type { ApplicationFields } from '@/types';
 
@@ -16,16 +22,22 @@ import type { ApplicationFields } from '@/types';
 
 const RUNS = 20;
 const P95_LIMIT_MS = 5000;
-const TIMEOUT_MS = RUNS * 20_000; // 20s per call headroom
+const INTER_RUN_DELAY_MS = 500;
+const TIMEOUT_MS = RUNS * (20_000 + INTER_RUN_DELAY_MS);
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-// Minimal 1×1 gray pixel PNG — small enough to keep benchmark costs low
-// while still producing a valid image_url block for the vision API.
-const TINY_PNG_B64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAABjE+ibYAAAAASUVORK5CYII=';
+const FIXTURE_PATH = path.join(__dirname, 'fixtures/test-label-clean.jpg');
 
-const imageBuffer = Buffer.from(TINY_PNG_B64, 'base64');
+if (!fs.existsSync(FIXTURE_PATH)) {
+  throw new Error(
+    'Test fixture not found: __tests__/fixtures/test-label-clean.jpg' +
+    ' — copy a real JPEG label image there before running the benchmark'
+  );
+}
+
+const imageBuffer = fs.readFileSync(FIXTURE_PATH);
+const imageMimeType = 'image/jpeg';
 
 const fields: ApplicationFields = {
   beverage_type: 'distilled_spirits',
@@ -69,7 +81,7 @@ describe('Latency Benchmark — verify() single label', () => {
       for (let i = 0; i < RUNS; i++) {
         const start = Date.now();
         try {
-          await verify(fields, [imageBuffer], ['image/png']);
+          await verify(fields, [imageBuffer], [imageMimeType]);
           const elapsed = Date.now() - start;
           times.push(elapsed);
           const status = elapsed <= P95_LIMIT_MS ? '✓' : '!';
@@ -80,6 +92,7 @@ describe('Latency Benchmark — verify() single label', () => {
           errors.push(`Run ${i + 1}: ${msg}`);
           console.log(`  [bench] run ${String(i + 1).padStart(2, '0')}/${RUNS}  ${formatMs(elapsed).padStart(7)}  ✗ ERROR: ${msg}`);
         }
+        await new Promise((resolve) => setTimeout(resolve, INTER_RUN_DELAY_MS));
       }
 
       if (times.length === 0) {

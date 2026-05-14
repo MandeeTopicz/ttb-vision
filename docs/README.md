@@ -133,11 +133,18 @@ the agent queue. Production requires SSO/Active Directory integration. See `docs
 
 *To be populated after running `npm run bench` against the production API.*
 
+Before running, copy a real JPEG label image to `__tests__/fixtures/test-label-clean.jpg`.
+The benchmark will throw a clear error if the fixture is missing.
+
 Run the benchmark and record results here before deploying to Vercel:
 
 ```bash
 OPENAI_API_KEY=sk-... npm run bench
 ```
+
+The benchmark uses a 500ms inter-run delay to stay within OpenAI Tier 1 token limits
+(30,000 TPM). This does not affect single-label latency measurements as each call is
+independent. Production deployments on Tier 2+ will not require this pacing.
 
 Expected output format:
 
