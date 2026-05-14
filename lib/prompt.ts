@@ -6,39 +6,20 @@ type ContentPart =
   | { type: 'image_url'; image_url: { url: string } };
 
 function buildGovernmentWarningText(): string {
-  const gw = getGovernmentWarning();
-  const fr = gw.formatting_rules;
-  return `GOVERNMENT WARNING REQUIREMENT (${gw.citation}):
-Exact statutory text that MUST appear verbatim on every label:
-"${gw.exact_text}"
-
-Formatting requirements:
-- ${fr.government_warning_label_caps_bold.requirement} (${fr.government_warning_label_caps_bold.citation})
-- ${fr.remainder_not_bold.requirement} (${fr.remainder_not_bold.citation})
-- ${fr.contrasting_background.requirement} (${fr.contrasting_background.citation})
-- ${fr.separate_and_apart.requirement} (${fr.separate_and_apart.citation})
-- ${fr.continuous_statement.requirement} (${fr.continuous_statement.citation})`;
+  const citation = getGovernmentWarning().citation.split('—')[0].trim(); // "27 CFR Part 16"
+  return `GOVERNMENT WARNING (${citation}): Verify the exact statutory text is present verbatim on the label. "GOVERNMENT WARNING:" must appear in ALL CAPS and bold; the remainder must NOT be bold; the statement must appear separate from other label content.`;
 }
 
 function buildMandatoryFieldsText(beverageType: ApplicationFields['beverage_type']): string {
   const ruleset = getRuleset(beverageType);
-  const lines: string[] = [`MANDATORY FIELDS (${ruleset.citation}):`];
+  const section = ruleset.citation.split('—')[0].trim(); // e.g. "27 CFR Part 5"
+  const lines: string[] = [`MANDATORY FIELDS (${section}):`];
 
   for (const f of ruleset.mandatory_fields) {
-    const cond = f.conditional ? ' [CONDITIONAL: only required when is_import = true]' : '';
-    lines.push(`\n- ${f.label} | field key: "${f.field}" | ${f.citation}${cond}`);
-    lines.push(`  Requirement: ${f.requirement}`);
-    if ('match_logic' in f && f.match_logic) {
-      lines.push(`  Match logic: ${f.match_logic}`);
-    }
-    if ('fuzzy_match_policy' in f && f.fuzzy_match_policy) {
-      lines.push(`  Fuzzy match policy: ${f.fuzzy_match_policy}`);
-    }
-    if ('acceptable_formats' in f && Array.isArray(f.acceptable_formats) && f.acceptable_formats.length > 0) {
-      lines.push(`  Acceptable formats: ${(f.acceptable_formats as string[]).join(' | ')}`);
-    }
-    if ('non_compliant_formats' in f && Array.isArray(f.non_compliant_formats) && f.non_compliant_formats.length > 0) {
-      lines.push(`  Non-compliant formats: ${(f.non_compliant_formats as string[]).join(' | ')}`);
+    const cond = f.conditional ? ' [import only — omit if is_import is false]' : '';
+    lines.push(`- ${f.field}${cond}: ${f.requirement}`);
+    if (f.fuzzy_match_policy) {
+      lines.push(`  Match: ${f.fuzzy_match_policy}`);
     }
   }
 
@@ -48,70 +29,27 @@ function buildMandatoryFieldsText(beverageType: ApplicationFields['beverage_type
 export function buildSystemPrompt(beverageType: ApplicationFields['beverage_type']): string {
   const rulesetVersion = getRulesetVersion();
 
-  return `## ROLE
-You are a TTB label compliance verification assistant. Your only job is to compare the provided application field data against the label image(s) and return a structured JSON result. You are not an approver or rejector — you identify matches, mismatches, and compliance issues so a human TTB compliance agent can make the final determination.
+  return `You are a TTB label compliance verification assistant. Compare application field data against the label image(s) and return structured JSON. You flag discrepancies — a human agent makes the final determination.
 
-## TTB RULES
-Ruleset version: ${rulesetVersion}
+Ruleset: ${rulesetVersion} | Beverage type: ${beverageType}
 
 ${buildGovernmentWarningText()}
 
 ${buildMandatoryFieldsText(beverageType)}
 
-## GLOBAL POLICIES
+CASE SENSITIVITY POLICY: brand_name, class_type, and bottler_name_address are case-insensitive — flag only punctuation, abbreviation, missing word, numeric, or spelling differences. GOVERNMENT WARNING: must be ALL CAPS bold — flag any case deviation.
 
-FUZZY MATCH POLICY: All fuzzy matches MUST be flagged — never auto-passed. This includes punctuation differences, abbreviations, missing words, numeric differences, and spelling differences. Set status to "flag" and describe the specific discrepancy in the note. The human agent makes the final determination. This is a compliance tool — auto-passing any variant creates legal liability.
+FUZZY MATCH POLICY: Never auto-pass any variant. Flag all differences with a descriptive note. overall_status is "flag_for_review" if ANY field is "flag" or "unable_to_verify" OR any compliance check fails. Confidence: 0.90–1.00 clear; 0.70–0.89 minor uncertainty; 0.50–0.69 use "flag"; 0.00–0.49 use "unable_to_verify" (image quality issue, not compliance). Note is required when status is "flag" or "unable_to_verify".
 
-CASE SENSITIVITY POLICY: Case differences alone are NEVER a flag for brand_name, class_type, or bottler_name_address. Match these fields case-insensitively — "Ridge Stone Distillery" and "RIDGE STONE DISTILLERY" are the same value. The sole exception is the GOVERNMENT WARNING: label, which must appear in ALL CAPS and bold per 27 CFR Part 16 § 16.22(a)(2) — flag any case deviation there.
-
-CONFIDENCE SCORING:
-- 0.90–1.00: Field clearly readable, unambiguous match or mismatch
-- 0.70–0.89: Field readable with minor uncertainty (glare, angle, partial shadow)
-- 0.50–0.69: Field partially obscured or ambiguous — use status "flag"
-- 0.00–0.49: Field cannot be reliably read — use status "unable_to_verify"
-
-STATUS DEFINITIONS:
-- "pass": Field on label matches application value within acceptable parameters AND meets TTB requirements
-- "flag": Discrepancy detected between label and application, OR a TTB compliance issue detected — agent review required. NOTE: "flag" means something is wrong with the label content. Use a descriptive note.
-- "unable_to_verify": Image quality insufficient to reliably verify this field. This is an IMAGE problem, not a label compliance problem. Use this when the field cannot be read due to blur, glare, or obstruction. Use a note describing the image issue.
-
-## OUTPUT INSTRUCTIONS
-Return ONLY valid JSON. No markdown code fences. No prose. No explanation outside the JSON object. If you include anything other than a valid JSON object, the entire verification will fail.
-
-Required JSON structure (every key is required unless marked optional):
+Return ONLY valid JSON. No markdown. No prose:
 {
-  "overall_status": "pass" or "flag_for_review",
-  "fields": [
-    {
-      "field": "<field key from the mandatory fields list above>",
-      "status": "pass" | "flag" | "unable_to_verify",
-      "confidence": <number from 0.0 to 1.0>,
-      "app_value": "<exact value from application data>",
-      "label_value": "<what you read on the label — omit only if field is completely unreadable>",
-      "note": "<required when status is flag or unable_to_verify; describe the specific discrepancy or image issue>"
-    }
-  ],
-  "compliance": {
-    "government_warning_present": <boolean — is the government warning statement present on the label?>,
-    "government_warning_verbatim": <boolean — does it match the EXACT statutory text character for character?>,
-    "government_warning_caps_bold": <boolean — does "GOVERNMENT WARNING:" appear in ALL CAPS and bold?>,
-    "government_warning_note": "<optional string — describe any formatting issue found>",
-    "abv_format_compliant": <boolean — is the ABV format compliant with the rules above?>,
-    "abv_format_note": "<optional string — describe any format issue>"
-  },
-  "metadata": {
-    "model_version": "<your exact model identifier, e.g. gpt-4o-2024-08-06>",
-    "ruleset_version": "${rulesetVersion}",
-    "timestamp": "<current UTC datetime in ISO 8601 format>",
-    "verification_id": "<generate a new UUID v4>"
-  }
+  "overall_status": "pass" | "flag_for_review",
+  "fields": [{"field": string, "status": "pass"|"flag"|"unable_to_verify", "confidence": 0–1, "app_value": string, "label_value": string, "note": string}],
+  "compliance": {"government_warning_present": bool, "government_warning_verbatim": bool, "government_warning_caps_bold": bool, "government_warning_note": string, "abv_format_compliant": bool, "abv_format_note": string},
+  "metadata": {"model_version": string, "ruleset_version": "${rulesetVersion}", "timestamp": "ISO8601", "verification_id": "UUIDv4"}
 }
 
-IMPORTANT RULES FOR THE fields ARRAY:
-1. Include one entry for EVERY mandatory field for this beverage type.
-2. For conditional fields (is_import = true): include them if is_import is true in the application data; omit if false.
-3. For "bottler_name_address": the app_value is the combined name and address from the application data. Verify both appear on the label.
-4. For overall_status: set to "flag_for_review" if ANY field has status "flag" or "unable_to_verify", OR if ANY compliance check fails. Set to "pass" ONLY if ALL fields are "pass" AND ALL compliance checks pass.`;
+Include one fields entry per mandatory field for this beverage type. Omit country_of_origin when is_import is false. label_value may be omitted only if the field is completely unreadable. note is required when status is "flag" or "unable_to_verify".`;
 }
 
 // Escapes the five XML-significant characters in element content.

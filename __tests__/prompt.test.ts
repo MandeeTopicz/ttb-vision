@@ -106,19 +106,19 @@ describe('buildSystemPrompt()', () => {
     }
   });
 
-  it('wine prompt includes wine-specific ABV citation (§ 4.36)', () => {
+  it('wine prompt does not include per-field CFR citations (stripped for token efficiency)', () => {
     const p = buildSystemPrompt('wine');
-    expect(p).toContain('§ 4.36');
+    expect(p).not.toContain('§ 4.36');
   });
 
-  it('malt_beverage prompt includes malt-specific ABV citation (§ 7.65)', () => {
+  it('malt_beverage prompt does not include per-field CFR citations', () => {
     const p = buildSystemPrompt('malt_beverage');
-    expect(p).toContain('§ 7.65');
+    expect(p).not.toContain('§ 7.65');
   });
 
-  it('distilled_spirits prompt includes ABV-specific acceptable formats from rules', () => {
+  it('distilled_spirits prompt does not include acceptable_formats (stripped for token efficiency)', () => {
     const p = buildSystemPrompt('distilled_spirits');
-    expect(p).toContain('45% Alc./Vol.');
+    expect(p).not.toContain('45% Alc./Vol.');
   });
 
   it('no prompt contains prohibited output language', () => {

@@ -142,7 +142,7 @@ OPENAI_API_KEY=sk-... npm run bench
 
 The benchmark uses a 3s inter-run delay to stay within OpenAI Tier 1 token limits.
 
-### Results — 2026-05-14
+### Results — 2026-05-14 (post prompt optimization)
 
 Fixture: `test-label-clean.jpg` (358 KB, 600×327 px, JPEG quality 75)
 Model: `gpt-4o` · Runs: 5 · Tier 1
@@ -150,12 +150,12 @@ Model: `gpt-4o` · Runs: 5 · Tier 1
 ```
 ── Latency Results ──────────────────────────
    Successful runs : 5/5
-   p50             : 8,159ms
-   p95             : 8,375ms  ✓ PASS   (must be ≤ 20,000ms)
-   p99             : 8,375ms
-   avg             : 7,562ms
-   min             : 6,266ms
-   max             : 8,375ms
+   p50             : 7,422ms
+   p95             : 8,772ms  ✓ PASS   (must be ≤ 20,000ms)
+   p99             : 8,772ms
+   avg             : 7,345ms
+   min             : 6,390ms
+   max             : 8,772ms
 ─────────────────────────────────────────────
 ```
 
