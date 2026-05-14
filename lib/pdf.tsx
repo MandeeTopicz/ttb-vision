@@ -67,6 +67,38 @@ const s = StyleSheet.create({
   bannerPassText: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#166534' },
   bannerFlagText: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#92400e' },
 
+  // Agent determination banner
+  bannerApproved: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderStyle: 'solid',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 8,
+  },
+  bannerRejected: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderStyle: 'solid',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 8,
+  },
+  bannerDeterminationPending: {
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderStyle: 'solid',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 8,
+  },
+  bannerApprovedText: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#166534' },
+  bannerRejectedText: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#b91c1c' },
+  bannerDeterminationPendingText: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#6b7280' },
+
   // Section headings
   sectionTitle: { fontSize: 10, fontFamily: 'Helvetica-Bold', marginBottom: 6, marginTop: 12 },
   sectionSubtitle: {
@@ -160,7 +192,10 @@ function ComplianceCheckRow({
   );
 }
 
-function SingleLabelPDFDocument({ result }: { result: VerificationResponse }) {
+function SingleLabelPDFDocument({ result, agentDetermination }: {
+  result: VerificationResponse;
+  agentDetermination?: 'approved' | 'rejected' | null;
+}) {
   const isPass = result.overall_status === 'pass';
   const bannerText = isPass
     ? 'No Issues Detected — Ready for Agent Sign-Off'
@@ -234,6 +269,22 @@ function SingleLabelPDFDocument({ result }: { result: VerificationResponse }) {
           pass={result.compliance.abv_format_compliant}
           note={result.compliance.abv_format_note}
         />
+
+        {/* Agent Determination */}
+        <Text style={s.sectionTitle}>Agent Determination</Text>
+        {agentDetermination === 'approved' ? (
+          <View style={s.bannerApproved}>
+            <Text style={s.bannerApprovedText}>APPROVED</Text>
+          </View>
+        ) : agentDetermination === 'rejected' ? (
+          <View style={s.bannerRejected}>
+            <Text style={s.bannerRejectedText}>REJECTED</Text>
+          </View>
+        ) : (
+          <View style={s.bannerDeterminationPending}>
+            <Text style={s.bannerDeterminationPendingText}>PENDING AGENT DETERMINATION</Text>
+          </View>
+        )}
 
         {/* Metadata */}
         <View style={s.divider} />
@@ -420,11 +471,11 @@ function BatchPDFDocument({ summary }: { summary: BatchSummary }) {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-export async function generatePDFBlob(result: VerificationResponse): Promise<Blob> {
-  return pdf(<SingleLabelPDFDocument result={result} />).toBlob();
+export async function generatePDFBlob(result: VerificationResponse, agentDetermination?: 'approved' | 'rejected' | null): Promise<Blob> {
+  return pdf(<SingleLabelPDFDocument result={result} agentDetermination={agentDetermination} />).toBlob();
 }
 
-export function generatePlainText(result: VerificationResponse): string {
+export function generatePlainText(result: VerificationResponse, agentDetermination?: 'approved' | 'rejected' | null): string {
   const sep = '─'.repeat(60);
   const lines: string[] = [];
 
@@ -466,6 +517,17 @@ export function generatePlainText(result: VerificationResponse): string {
   if (result.compliance.abv_format_note) {
     lines.push(`  Note: ${result.compliance.abv_format_note}`);
   }
+  lines.push('');
+
+  lines.push('AGENT DETERMINATION');
+  lines.push(sep);
+  lines.push(
+    agentDetermination === 'approved'
+      ? 'APPROVED'
+      : agentDetermination === 'rejected'
+        ? 'REJECTED'
+        : 'PENDING AGENT DETERMINATION'
+  );
   lines.push('');
 
   lines.push(sep);

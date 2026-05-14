@@ -64,20 +64,24 @@ export type ErrorCode =
 // Submission queue types (three-party workflow)
 
 export interface Submission {
-  id:              string;        // UUID v4
-  submitted_at:    string;        // ISO 8601
-  status:          'pending' | 'reviewed';
-  fields:          ApplicationFields;
-  images:          string[];      // Vercel Blob public URLs
-  image_mimetypes: string[];      // parallel array to images
+  id:                   string;        // UUID v4
+  submitted_at:         string;        // ISO 8601
+  status:               'pending' | 'reviewed';
+  fields:               ApplicationFields;
+  images:               string[];      // Vercel Blob public URLs
+  image_mimetypes:      string[];      // parallel array to images
+  verification_outcome?: 'pass' | 'flag_for_review' | null;
+  agent_determination?:  'approved' | 'rejected' | null;
 }
 
 export interface SubmissionListItem {
-  id:            string;
-  submitted_at:  string;
-  status:        'pending' | 'reviewed';
-  brand_name:    string;
-  beverage_type: ApplicationFields['beverage_type'];
+  id:                   string;
+  submitted_at:         string;
+  status:               'pending' | 'reviewed';
+  brand_name:           string;
+  beverage_type:        ApplicationFields['beverage_type'];
+  verification_outcome?: 'pass' | 'flag_for_review' | null;
+  agent_determination?:  'approved' | 'rejected' | null;
 }
 
 // Batch types

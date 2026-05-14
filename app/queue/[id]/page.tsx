@@ -74,6 +74,9 @@ export default function AgentReviewPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  const [agentDetermination, setAgentDetermination] = useState<'approved' | 'rejected' | null>(null);
+  const [determinationLoading, setDeterminationLoading] = useState(false);
+
   // ── Fetch submission ──
   useEffect(() => {
     if (!id) return;
@@ -85,6 +88,7 @@ export default function AgentReviewPage() {
         } else {
           const data = await res.json() as Submission;
           setSubmission(data);
+          setAgentDetermination(data.agent_determination ?? null);
         }
       })
       .catch(() => setFetchError('Could not load submission. Please go back and try again.'))
@@ -124,10 +128,14 @@ export default function AgentReviewPage() {
       if (!res.ok) {
         setVerifyError(data as ErrorResponse);
       } else {
-        setResult(data as VerificationResponse);
-        // Mark reviewed
-        await fetch(`/api/submissions/${id}`, { method: 'PATCH' });
-        setSubmission((prev) => prev ? { ...prev, status: 'reviewed' } : prev);
+        const verificationResult = data as VerificationResponse;
+        setResult(verificationResult);
+        await fetch(`/api/submissions/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'reviewed', verification_outcome: verificationResult.overall_status }),
+        });
+        setSubmission((prev) => prev ? { ...prev, status: 'reviewed', verification_outcome: verificationResult.overall_status } : prev);
         setTimeout(() => resultsRef.current?.focus(), 50);
       }
     } catch {
@@ -136,6 +144,25 @@ export default function AgentReviewPage() {
       setVerifyLoading(false);
     }
   }, [submission, id]);
+
+  // ── Agent determination ──
+  const handleSetDetermination = useCallback(async (det: 'approved' | 'rejected') => {
+    if (!id) return;
+    setDeterminationLoading(true);
+    try {
+      await fetch(`/api/submissions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_determination: det }),
+      });
+      setAgentDetermination(det);
+      setSubmission((prev) => prev ? { ...prev, agent_determination: det } : prev);
+    } catch {
+      // Silent — buttons remain enabled so the agent can retry
+    } finally {
+      setDeterminationLoading(false);
+    }
+  }, [id]);
 
   // ── Unload guard ──
   useEffect(() => {
@@ -285,22 +312,70 @@ export default function AgentReviewPage() {
               </div>
             )}
 
-            {/* Results */}
+            {/* Results + Agent Determination */}
             {result && (
-              <div
-                ref={resultsRef}
-                tabIndex={-1}
-                className="outline-none"
-                aria-live="polite"
-                aria-atomic="false"
-              >
-                <ResultsPanel
-                  result={result}
-                  exportSlot={
-                    <ReportExport mode="single" result={result} onExport={() => setExported(true)} />
-                  }
-                />
-              </div>
+              <>
+                <div
+                  ref={resultsRef}
+                  tabIndex={-1}
+                  className="outline-none"
+                  aria-live="polite"
+                  aria-atomic="false"
+                >
+                  <ResultsPanel
+                    result={result}
+                    exportSlot={
+                      <ReportExport
+                        mode="single"
+                        result={result}
+                        agentDetermination={agentDetermination}
+                        onExport={() => setExported(true)}
+                      />
+                    }
+                  />
+                </div>
+
+                <Separator />
+
+                {/* Agent Determination */}
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">Agent Determination</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Record your final compliance determination. This is your official decision as a TTB
+                      compliance agent and is independent of the AI verification result — an AI-flagged
+                      label may be approved and an AI-passed label may be rejected.
+                    </p>
+                  </div>
+
+                  {agentDetermination && (
+                    <p className={
+                      agentDetermination === 'approved'
+                        ? 'text-sm font-semibold text-green-700'
+                        : 'text-sm font-semibold text-destructive'
+                    }>
+                      Determination recorded: {agentDetermination === 'approved' ? 'APPROVED' : 'REJECTED'}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={() => handleSetDetermination('approved')}
+                      disabled={determinationLoading || agentDetermination !== null}
+                      className="bg-green-600 hover:bg-green-700 text-white border-0 disabled:opacity-50"
+                    >
+                      Mark Approved
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleSetDetermination('rejected')}
+                      disabled={determinationLoading || agentDetermination !== null}
+                    >
+                      Mark Rejected
+                    </Button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}

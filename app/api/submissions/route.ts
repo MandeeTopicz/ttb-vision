@@ -18,6 +18,8 @@ export async function GET(): Promise<Response> {
       status: s.status,
       brand_name: s.fields.brand_name,
       beverage_type: s.fields.beverage_type,
+      verification_outcome: s.verification_outcome ?? null,
+      agent_determination: s.agent_determination ?? null,
     }));
   return Response.json(list);
 }

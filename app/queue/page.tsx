@@ -13,17 +13,46 @@ const BEVERAGE_LABEL: Record<string, string> = {
   malt_beverage: 'Malt Beverage',
 };
 
-function StatusBadge({ status }: { status: 'pending' | 'reviewed' }) {
+function AiOutcomeBadge({ outcome }: { outcome: SubmissionListItem['verification_outcome'] }) {
+  if (outcome === 'pass') {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+        Pass
+      </span>
+    );
+  }
+  if (outcome === 'flag_for_review') {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+        Flagged
+      </span>
+    );
+  }
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-        status === 'pending'
-          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-          : 'bg-green-50 text-green-700 border border-green-200'
-      )}
-    >
-      {status === 'pending' ? 'Pending' : 'Reviewed'}
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground border border-border">
+      Pending
+    </span>
+  );
+}
+
+function DeterminationBadge({ determination }: { determination: SubmissionListItem['agent_determination'] }) {
+  if (determination === 'approved') {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+        Approved
+      </span>
+    );
+  }
+  if (determination === 'rejected') {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+        Rejected
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground border border-border">
+      Awaiting Decision
     </span>
   );
 }
@@ -108,7 +137,8 @@ export default function QueuePage() {
                   <th scope="col" className="px-4 py-2.5 text-left font-medium text-muted-foreground">Brand Name</th>
                   <th scope="col" className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden sm:table-cell">Beverage Type</th>
                   <th scope="col" className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Submitted</th>
-                  <th scope="col" className="px-4 py-2.5 text-left font-medium text-muted-foreground">Status</th>
+                  <th scope="col" className="px-4 py-2.5 text-left font-medium text-muted-foreground">AI Outcome</th>
+                  <th scope="col" className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden sm:table-cell">Agent Determination</th>
                   <th scope="col" className="px-4 py-2.5 text-left font-medium text-muted-foreground sr-only">Review</th>
                 </tr>
               </thead>
@@ -129,7 +159,10 @@ export default function QueuePage() {
                       {new Date(s.submitted_at).toLocaleString()}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={s.status} />
+                      <AiOutcomeBadge outcome={s.verification_outcome} />
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <DeterminationBadge determination={s.agent_determination} />
                     </td>
                     <td className="px-4 py-3">
                       <Link

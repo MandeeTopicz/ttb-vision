@@ -14,7 +14,7 @@ export async function GET(
 }
 
 export async function PATCH(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const { id } = await context.params;
@@ -22,6 +22,36 @@ export async function PATCH(
   if (!submission) {
     return Response.json({ error: 'Submission not found', code: 'NOT_FOUND' }, { status: 404 });
   }
-  await setSubmission({ ...submission, status: 'reviewed' });
-  return Response.json({ id, status: 'reviewed' });
+
+  let body: Record<string, unknown> = {};
+  try {
+    body = await request.json();
+  } catch {
+    // No body — fall through to default reviewed update
+  }
+
+  // Operation B: agent records final determination
+  if ('agent_determination' in body) {
+    const det = body.agent_determination;
+    if (det !== 'approved' && det !== 'rejected') {
+      return Response.json(
+        { error: 'agent_determination must be "approved" or "rejected"', code: 'VALIDATION_ERROR' },
+        { status: 400 }
+      );
+    }
+    await setSubmission({ ...submission, agent_determination: det });
+    return Response.json({ id, agent_determination: det });
+  }
+
+  // Operation A: system marks reviewed after verification runs
+  const outcome = body.verification_outcome;
+  const verificationOutcome: 'pass' | 'flag_for_review' | undefined =
+    outcome === 'pass' || outcome === 'flag_for_review' ? outcome : undefined;
+  const updated = {
+    ...submission,
+    status: 'reviewed' as const,
+    ...(verificationOutcome !== undefined ? { verification_outcome: verificationOutcome } : {}),
+  };
+  await setSubmission(updated);
+  return Response.json({ id, status: 'reviewed', verification_outcome: updated.verification_outcome ?? null });
 }
