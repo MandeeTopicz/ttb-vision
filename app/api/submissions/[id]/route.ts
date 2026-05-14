@@ -33,14 +33,15 @@ export async function PATCH(
   // Operation B: agent records final determination
   if ('agent_determination' in body) {
     const det = body.agent_determination;
-    if (det !== 'approved' && det !== 'rejected') {
+    if (det !== 'approved' && det !== 'rejected' && det !== 'resubmission_requested') {
       return Response.json(
-        { error: 'agent_determination must be "approved" or "rejected"', code: 'VALIDATION_ERROR' },
+        { error: 'agent_determination must be "approved", "rejected", or "resubmission_requested"', code: 'VALIDATION_ERROR' },
         { status: 400 }
       );
     }
-    await setSubmission({ ...submission, agent_determination: det });
-    return Response.json({ id, agent_determination: det });
+    const notes = typeof body.agent_notes === 'string' ? body.agent_notes.trim() || null : null;
+    await setSubmission({ ...submission, agent_determination: det, agent_notes: notes });
+    return Response.json({ id, agent_determination: det, agent_notes: notes });
   }
 
   // Operation A: system marks reviewed after verification runs

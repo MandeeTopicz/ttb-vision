@@ -20,6 +20,7 @@ export async function GET(): Promise<Response> {
       beverage_type: s.fields.beverage_type,
       verification_outcome: s.verification_outcome ?? null,
       agent_determination: s.agent_determination ?? null,
+      agent_notes: s.agent_notes ?? null,
     }));
   return Response.json(list);
 }

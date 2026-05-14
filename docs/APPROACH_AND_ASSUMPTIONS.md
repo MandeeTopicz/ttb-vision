@@ -176,6 +176,26 @@ Browser (React client)
 | **Choice** | Two separate form inputs (`bottler_name` + `bottler_address`), concatenated in `buildUserMessage()` into one `<bottler_name_address>` XML tag, returning one `FieldVerificationResult` with `field: 'bottler_name_address'` |
 | **Rationale** | 27 CFR § 5.63 (and equivalents § 4.35, § 7.63) treat bottler name and address as a single atomic label requirement. Splitting them into two verification results would misrepresent the regulatory structure. Two form fields provide better UX than a single free-text field while mapping correctly to the regulatory unit at the prompt layer. |
 
+### Agent Determination
+
+| | |
+|---|---|
+| **Options** | Binary approved/rejected; three-way approved/rejected/resubmission; free-form notes only |
+| **Choice** | Three determination outcomes with required notes for non-approval |
+| **Rationale** | Rejected and Resubmission Requested are distinct outcomes requiring different vendor actions. Rejected means the label is non-compliant and cannot be approved without material changes. Resubmission Requested means the agent cannot yet make a determination — typically because image quality prevented verification of one or more fields. Conflating the two forces agents to misuse the Rejected outcome for image problems, which misrepresents the compliance status in the case record. Agent notes are required for Rejected and Resubmission Requested so the case record documents the reason. Notes are optional for Approved. |
+
+The three outcomes and their intended use:
+
+| Outcome | When to use |
+|---|---|
+| **Approved** | Agent confirms label is compliant with TTB requirements. |
+| **Rejected** | Agent determines label is non-compliant. Notes required — must specify the compliance deficiency. |
+| **Resubmission Requested** | Agent cannot make a determination, typically because one or more fields returned `unable_to_verify` due to image quality, or because the vendor must correct specific issues before a compliance determination is possible. Notes required — must specify what the vendor needs to provide. |
+
+The `unable_to_verify` AI status is an image quality problem, not a compliance finding. It means the AI could not read a field from the uploaded image — it does not mean the label is non-compliant. Agents are prompted with a contextual warning when any field is `unable_to_verify`, guiding them toward Resubmission Requested rather than Rejected.
+
+Agent notes are part of the case record and are included in every exported report (PDF and plain text). In production, notes and the determination would be synced to the COLA record for the submitting vendor's reference.
+
 ### Output Language
 | | |
 |---|---|
@@ -473,6 +493,7 @@ A single batch CSV can contain rows with different `beverage_type` values. The c
 - OpenAI GPT-4o availability is assumed. If the model is deprecated, `OPENAI_MODEL` is updated in `.env.local` and the latency benchmark is re-run.
 - `@react-pdf/renderer` PDF generation runs in the browser. No server-side rendering of PDFs.
 - Batch processing is bounded by the deploying agent's OpenAI API tier. No application-level rate limiting is implemented.
+- Agent identity is not captured in the prototype (no authentication). In production, the reviewing agent's identity would be recorded from their SSO session and included in every case report per federal audit requirements.
 - The `fflate` library handles ZIP extraction synchronously on the server. Very large ZIP files (> 50 MB) are rejected before extraction.
 
 ### Regulatory

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ChevronRight, RefreshCw, Inbox } from 'lucide-react';
+import { ChevronRight, RefreshCw, Inbox, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { SubmissionListItem } from '@/types';
@@ -35,18 +35,32 @@ function AiOutcomeBadge({ outcome }: { outcome: SubmissionListItem['verification
   );
 }
 
-function DeterminationBadge({ determination }: { determination: SubmissionListItem['agent_determination'] }) {
+function DeterminationBadge({ determination, hasNotes }: {
+  determination: SubmissionListItem['agent_determination'];
+  hasNotes: boolean;
+}) {
+  const noteIcon = hasNotes ? (
+    <FileText className="size-3 ml-1 opacity-60" aria-label="Has agent notes" />
+  ) : null;
+
   if (determination === 'approved') {
     return (
       <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-        Approved
+        Approved{noteIcon}
       </span>
     );
   }
   if (determination === 'rejected') {
     return (
       <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-        Rejected
+        Rejected{noteIcon}
+      </span>
+    );
+  }
+  if (determination === 'resubmission_requested') {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+        Resubmission Requested{noteIcon}
       </span>
     );
   }
@@ -162,7 +176,10 @@ export default function QueuePage() {
                       <AiOutcomeBadge outcome={s.verification_outcome} />
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
-                      <DeterminationBadge determination={s.agent_determination} />
+                      <DeterminationBadge
+                        determination={s.agent_determination}
+                        hasNotes={!!s.agent_notes}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <Link

@@ -16,7 +16,8 @@ import type { VerificationResponse, BatchSummary } from '@/types';
 interface SingleProps {
   mode: 'single';
   result: VerificationResponse;
-  agentDetermination?: 'approved' | 'rejected' | null;
+  agentDetermination?: 'approved' | 'rejected' | 'resubmission_requested' | null;
+  agentNotes?: string | null;
   onExport?: () => void;
 }
 
@@ -39,7 +40,7 @@ export function ReportExport(props: Props) {
     try {
       const blob =
         props.mode === 'single'
-          ? await generatePDFBlob(props.result, props.agentDetermination)
+          ? await generatePDFBlob(props.result, props.agentDetermination, props.agentNotes)
           : await generateBatchPDFBlob(props.summary);
 
       const filename =
@@ -64,7 +65,7 @@ export function ReportExport(props: Props) {
   async function handleCopyText() {
     const text =
       props.mode === 'single'
-        ? generatePlainText(props.result, props.agentDetermination)
+        ? generatePlainText(props.result, props.agentDetermination, props.agentNotes)
         : generateBatchPlainText(props.summary);
 
     await navigator.clipboard.writeText(text);

@@ -109,6 +109,7 @@ architecture.
   - `supervisor` — can view all agent activity; can trigger re-verification
   - `admin` — can edit `ttb_rules.json` through the rules management UI (see §5); can manage users
 - **Immutable audit logs** — Every verification is logged with: timestamp, agent identity, beverage type, verification ID, overall status, and ruleset version. Logs are write-once and cannot be modified after the fact. Required for compliance audit trails.
+- **Determination audit record** — Every agent determination records: agent ID, agent name (from Treasury Active Directory), timestamp, determination outcome (Approved / Rejected / Resubmission Requested), and agent notes. This record is immutable once written. Agent identity is sourced from the Treasury Active Directory SSO session — no separate login. Required for federal compliance; the determination record is the authoritative case history entry filed against the COLA submission.
 - **Session timeout** — Session lifetime and timeout thresholds per federal security requirements (NIST SP 800-53 AC-12).
 
 ---

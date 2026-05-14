@@ -95,9 +95,22 @@ const s = StyleSheet.create({
     padding: 8,
     marginBottom: 8,
   },
+  bannerResubmission: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderStyle: 'solid',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 8,
+  },
   bannerApprovedText: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#166534' },
   bannerRejectedText: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#b91c1c' },
+  bannerResubmissionText: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#1d4ed8' },
   bannerDeterminationPendingText: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#6b7280' },
+  detNotes: { fontSize: 8, color: '#374151', marginTop: 4 },
+  detNotesLabel: { fontFamily: 'Helvetica-Bold', color: '#374151' },
+  detMeta: { fontSize: 8, color: '#6b7280', marginTop: 2 },
 
   // Section headings
   sectionTitle: { fontSize: 10, fontFamily: 'Helvetica-Bold', marginBottom: 6, marginTop: 12 },
@@ -192,9 +205,10 @@ function ComplianceCheckRow({
   );
 }
 
-function SingleLabelPDFDocument({ result, agentDetermination }: {
+function SingleLabelPDFDocument({ result, agentDetermination, agentNotes }: {
   result: VerificationResponse;
-  agentDetermination?: 'approved' | 'rejected' | null;
+  agentDetermination?: 'approved' | 'rejected' | 'resubmission_requested' | null;
+  agentNotes?: string | null;
 }) {
   const isPass = result.overall_status === 'pass';
   const bannerText = isPass
@@ -280,11 +294,20 @@ function SingleLabelPDFDocument({ result, agentDetermination }: {
           <View style={s.bannerRejected}>
             <Text style={s.bannerRejectedText}>REJECTED</Text>
           </View>
+        ) : agentDetermination === 'resubmission_requested' ? (
+          <View style={s.bannerResubmission}>
+            <Text style={s.bannerResubmissionText}>RESUBMISSION REQUESTED</Text>
+          </View>
         ) : (
           <View style={s.bannerDeterminationPending}>
-            <Text style={s.bannerDeterminationPendingText}>PENDING AGENT DETERMINATION</Text>
+            <Text style={s.bannerDeterminationPendingText}>PENDING — awaiting agent determination</Text>
           </View>
         )}
+        <Text style={s.detNotes}>
+          <Text style={s.detNotesLabel}>Agent Notes: </Text>
+          {agentNotes || 'No notes recorded'}
+        </Text>
+        <Text style={s.detMeta}>Reviewing Agent: N/A (authentication not implemented in prototype)</Text>
 
         {/* Metadata */}
         <View style={s.divider} />
@@ -471,11 +494,19 @@ function BatchPDFDocument({ summary }: { summary: BatchSummary }) {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-export async function generatePDFBlob(result: VerificationResponse, agentDetermination?: 'approved' | 'rejected' | null): Promise<Blob> {
-  return pdf(<SingleLabelPDFDocument result={result} agentDetermination={agentDetermination} />).toBlob();
+export async function generatePDFBlob(
+  result: VerificationResponse,
+  agentDetermination?: 'approved' | 'rejected' | 'resubmission_requested' | null,
+  agentNotes?: string | null,
+): Promise<Blob> {
+  return pdf(<SingleLabelPDFDocument result={result} agentDetermination={agentDetermination} agentNotes={agentNotes} />).toBlob();
 }
 
-export function generatePlainText(result: VerificationResponse, agentDetermination?: 'approved' | 'rejected' | null): string {
+export function generatePlainText(
+  result: VerificationResponse,
+  agentDetermination?: 'approved' | 'rejected' | 'resubmission_requested' | null,
+  agentNotes?: string | null,
+): string {
   const sep = '─'.repeat(60);
   const lines: string[] = [];
 
@@ -526,8 +557,12 @@ export function generatePlainText(result: VerificationResponse, agentDeterminati
       ? 'APPROVED'
       : agentDetermination === 'rejected'
         ? 'REJECTED'
-        : 'PENDING AGENT DETERMINATION'
+        : agentDetermination === 'resubmission_requested'
+          ? 'RESUBMISSION REQUESTED'
+          : 'PENDING — awaiting agent determination'
   );
+  lines.push(`Agent Notes:       ${agentNotes || 'No notes recorded'}`);
+  lines.push('Reviewing Agent:   N/A (authentication not implemented in prototype)');
   lines.push('');
 
   lines.push(sep);

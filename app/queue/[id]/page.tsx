@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, Loader2, AlertCircle, PlayCircle } from 'lucide-react';
+import { ChevronLeft, Loader2, AlertCircle, PlayCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ResultsPanel } from '@/components/ResultsPanel';
@@ -39,6 +39,20 @@ const ERROR_GUIDANCE: Record<ErrorCode, string> = {
   TIMEOUT: 'The verification timed out. Please retry — if the problem persists, proceed with manual review.',
 };
 
+type DeterminationValue = 'approved' | 'rejected' | 'resubmission_requested';
+
+const DETERMINATION_LABEL: Record<DeterminationValue, string> = {
+  approved: 'APPROVED',
+  rejected: 'REJECTED',
+  resubmission_requested: 'RESUBMISSION REQUESTED',
+};
+
+const DETERMINATION_CLASS: Record<DeterminationValue, string> = {
+  approved: 'text-green-700',
+  rejected: 'text-destructive',
+  resubmission_requested: 'text-blue-700',
+};
+
 async function blobUrlToFile(url: string, mimeType: string, index: number): Promise<File> {
   const res = await fetch(url);
   const blob = await res.blob();
@@ -59,6 +73,8 @@ function FieldRow({ label, value }: { label: string; value: string }) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+const MAX_NOTES = 1000;
+
 export default function AgentReviewPage() {
   const { id } = useParams<{ id: string }>();
 
@@ -74,7 +90,9 @@ export default function AgentReviewPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const [agentDetermination, setAgentDetermination] = useState<'approved' | 'rejected' | null>(null);
+  const [agentDetermination, setAgentDetermination] = useState<DeterminationValue | null>(null);
+  const [agentNotes, setAgentNotes] = useState('');
+  const [notesError, setNotesError] = useState<string | null>(null);
   const [determinationLoading, setDeterminationLoading] = useState(false);
 
   // ── Fetch submission ──
@@ -89,6 +107,7 @@ export default function AgentReviewPage() {
           const data = await res.json() as Submission;
           setSubmission(data);
           setAgentDetermination(data.agent_determination ?? null);
+          setAgentNotes(data.agent_notes ?? '');
         }
       })
       .catch(() => setFetchError('Could not load submission. Please go back and try again.'))
@@ -146,23 +165,34 @@ export default function AgentReviewPage() {
   }, [submission, id]);
 
   // ── Agent determination ──
-  const handleSetDetermination = useCallback(async (det: 'approved' | 'rejected') => {
+  const handleSetDetermination = useCallback(async (det: DeterminationValue) => {
+    // Validate notes
+    if (det === 'rejected' && !agentNotes.trim()) {
+      setNotesError('Notes are required when rejecting a submission');
+      return;
+    }
+    if (det === 'resubmission_requested' && !agentNotes.trim()) {
+      setNotesError('Please specify what the vendor needs to correct or resubmit');
+      return;
+    }
+    setNotesError(null);
+
     if (!id) return;
     setDeterminationLoading(true);
     try {
       await fetch(`/api/submissions/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_determination: det }),
+        body: JSON.stringify({ agent_determination: det, agent_notes: agentNotes.trim() || null }),
       });
       setAgentDetermination(det);
-      setSubmission((prev) => prev ? { ...prev, agent_determination: det } : prev);
+      setSubmission((prev) => prev ? { ...prev, agent_determination: det, agent_notes: agentNotes.trim() || null } : prev);
     } catch {
       // Silent — buttons remain enabled so the agent can retry
     } finally {
       setDeterminationLoading(false);
     }
-  }, [id]);
+  }, [id, agentNotes]);
 
   // ── Unload guard ──
   useEffect(() => {
@@ -172,6 +202,9 @@ export default function AgentReviewPage() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [verifyLoading, result, exported]);
+
+  const hasUnverifiableFields = result?.fields.some((f) => f.status === 'unable_to_verify') ?? false;
+  const locked = agentDetermination !== null;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -329,6 +362,7 @@ export default function AgentReviewPage() {
                         mode="single"
                         result={result}
                         agentDetermination={agentDetermination}
+                        agentNotes={agentNotes}
                         onExport={() => setExported(true)}
                       />
                     }
@@ -348,20 +382,71 @@ export default function AgentReviewPage() {
                     </p>
                   </div>
 
+                  {/* Confirmation banner */}
                   {agentDetermination && (
-                    <p className={
-                      agentDetermination === 'approved'
-                        ? 'text-sm font-semibold text-green-700'
-                        : 'text-sm font-semibold text-destructive'
-                    }>
-                      Determination recorded: {agentDetermination === 'approved' ? 'APPROVED' : 'REJECTED'}
-                    </p>
+                    <div>
+                      <p className={`text-sm font-semibold ${DETERMINATION_CLASS[agentDetermination]}`}>
+                        Determination recorded: {DETERMINATION_LABEL[agentDetermination]}
+                      </p>
+                      {agentNotes && (
+                        <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{agentNotes}</p>
+                      )}
+                    </div>
                   )}
 
+                  {/* Notes textarea */}
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="agent-notes" className="text-sm font-medium text-foreground">
+                      Agent Notes
+                    </label>
+                    <textarea
+                      id="agent-notes"
+                      value={agentNotes}
+                      onChange={(e) => {
+                        if (e.target.value.length <= MAX_NOTES) setAgentNotes(e.target.value);
+                        if (notesError) setNotesError(null);
+                      }}
+                      readOnly={locked}
+                      maxLength={MAX_NOTES}
+                      rows={4}
+                      placeholder="Document your findings, reasoning, or instructions to the vendor. These notes will be included in the case report."
+                      className={`w-full rounded-md border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring transition-colors ${
+                        locked
+                          ? 'border-border bg-muted/30 cursor-default'
+                          : notesError
+                            ? 'border-destructive bg-background focus:ring-destructive/30'
+                            : 'border-border bg-background'
+                      }`}
+                      aria-describedby={notesError ? 'notes-error' : undefined}
+                    />
+                    <div className="flex items-center justify-between">
+                      {notesError ? (
+                        <p id="notes-error" role="alert" className="text-xs text-destructive">{notesError}</p>
+                      ) : (
+                        <span />
+                      )}
+                      {!locked && (
+                        <p className="text-xs text-muted-foreground tabular-nums">{agentNotes.length}/{MAX_NOTES}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* unable_to_verify contextual warning */}
+                  {hasUnverifiableFields && !locked && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                      <AlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-600" aria-hidden />
+                      <p className="text-sm text-amber-800">
+                        One or more fields could not be verified due to image quality. Consider requesting
+                        a clearer image before making a determination.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Determination buttons */}
                   <div className="flex flex-wrap gap-2">
                     <Button
                       onClick={() => handleSetDetermination('approved')}
-                      disabled={determinationLoading || agentDetermination !== null}
+                      disabled={determinationLoading || locked}
                       className="bg-green-600 hover:bg-green-700 text-white border-0 disabled:opacity-50"
                     >
                       Mark Approved
@@ -369,9 +454,16 @@ export default function AgentReviewPage() {
                     <Button
                       variant="destructive"
                       onClick={() => handleSetDetermination('rejected')}
-                      disabled={determinationLoading || agentDetermination !== null}
+                      disabled={determinationLoading || locked}
                     >
                       Mark Rejected
+                    </Button>
+                    <Button
+                      onClick={() => handleSetDetermination('resubmission_requested')}
+                      disabled={determinationLoading || locked}
+                      className="bg-blue-600 hover:bg-blue-700 text-white border-0 disabled:opacity-50"
+                    >
+                      Request Resubmission
                     </Button>
                   </div>
                 </div>

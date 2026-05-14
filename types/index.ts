@@ -71,7 +71,8 @@ export interface Submission {
   images:               string[];      // Vercel Blob public URLs
   image_mimetypes:      string[];      // parallel array to images
   verification_outcome?: 'pass' | 'flag_for_review' | null;
-  agent_determination?:  'approved' | 'rejected' | null;
+  agent_determination?:  'approved' | 'rejected' | 'resubmission_requested' | null;
+  agent_notes?:          string | null;
 }
 
 export interface SubmissionListItem {
@@ -81,7 +82,8 @@ export interface SubmissionListItem {
   brand_name:           string;
   beverage_type:        ApplicationFields['beverage_type'];
   verification_outcome?: 'pass' | 'flag_for_review' | null;
-  agent_determination?:  'approved' | 'rejected' | null;
+  agent_determination?:  'approved' | 'rejected' | 'resubmission_requested' | null;
+  agent_notes?:          string | null;
 }
 
 // Batch types
