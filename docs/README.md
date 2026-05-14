@@ -131,8 +131,6 @@ the agent queue. Production requires SSO/Active Directory integration. See `docs
 
 ## Latency Benchmark Results
 
-*To be populated after running `npm run bench` against the production API.*
-
 Before running, copy a real JPEG label image to `__tests__/fixtures/test-label-clean.jpg`.
 The benchmark will throw a clear error if the fixture is missing.
 
@@ -142,27 +140,28 @@ Run the benchmark and record results here before deploying to Vercel:
 OPENAI_API_KEY=sk-... npm run bench
 ```
 
-The benchmark uses a 500ms inter-run delay to stay within OpenAI Tier 1 token limits
-(30,000 TPM). This does not affect single-label latency measurements as each call is
-independent. Production deployments on Tier 2+ will not require this pacing.
+The benchmark uses a 3s inter-run delay to stay within OpenAI Tier 1 token limits.
 
-Expected output format:
+### Results — 2026-05-14
+
+Fixture: `test-label-clean.jpg` (358 KB, 600×327 px, JPEG quality 75)
+Model: `gpt-4o` · Runs: 5 · Tier 1
 
 ```
 ── Latency Results ──────────────────────────
-  Runs: 5
-  p50:  ????ms
-  p95:  ????ms  ✓ PASS   (must be ≤ 20,000ms)
-  p99:  ????ms
-  avg:  ????ms
-  min:  ????ms
-  max:  ????ms
+   Successful runs : 5/5
+   p50             : 8,159ms
+   p95             : 8,375ms  ✓ PASS   (must be ≤ 20,000ms)
+   p99             : 8,375ms
+   avg             : 7,562ms
+   min             : 6,266ms
+   max             : 8,375ms
 ─────────────────────────────────────────────
 ```
 
 **Hard requirement:** p95 ≤ 20,000 ms. GPT-4o vision calls (image + system prompt)
-typically return in 11–14 seconds on the public API. Production on Azure OpenAI Service
-with dedicated capacity will be significantly faster.
+typically return in 6–9 seconds with a properly compressed image. Production on Azure
+OpenAI Service with dedicated capacity will be significantly faster.
 
 ---
 
