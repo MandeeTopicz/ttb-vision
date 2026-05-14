@@ -307,6 +307,12 @@ Per 27 CFR § 5.65:
 
 Mandatory for imported products only. The `is_import` boolean in the application fields drives whether this field is checked. For domestic products, the field is omitted from the prompt and from the results. AI never decides whether a product is an import.
 
+### Case Sensitivity Policy
+
+TTB regulations do not specify case requirements for brand names, class designations, or bottler information. These fields are matched case-insensitively — a case difference alone is never a flag. The government warning label is the sole exception: 27 CFR Part 16 § 16.22(a)(2) explicitly requires "GOVERNMENT WARNING:" in all caps and bold, making this the only field where case is a regulatory requirement rather than a stylistic choice.
+
+This distinction is documented in `config/ttb_rules.json` under `verification_policy.case_sensitivity_policy` and injected explicitly into the AI system prompt via a dedicated CASE SENSITIVITY POLICY section. The rule is expressed as a prompt instruction rather than left to implicit AI judgment, ensuring deterministic, auditable behavior consistent with Treasury compliance requirements.
+
 ### Rules Maintainability
 
 - Every rule has a `citation` field with the exact CFR section.

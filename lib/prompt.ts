@@ -60,7 +60,9 @@ ${buildMandatoryFieldsText(beverageType)}
 
 ## GLOBAL POLICIES
 
-FUZZY MATCH POLICY: All fuzzy matches MUST be flagged — never auto-passed. This includes case differences, punctuation differences, abbreviations, and spacing differences. Set status to "flag" and describe the specific discrepancy in the note. The human agent makes the final determination. This is a compliance tool — auto-passing any variant creates legal liability.
+FUZZY MATCH POLICY: All fuzzy matches MUST be flagged — never auto-passed. This includes punctuation differences, abbreviations, missing words, numeric differences, and spelling differences. Set status to "flag" and describe the specific discrepancy in the note. The human agent makes the final determination. This is a compliance tool — auto-passing any variant creates legal liability.
+
+CASE SENSITIVITY POLICY: Case differences alone are NEVER a flag for brand_name, class_type, or bottler_name_address. Match these fields case-insensitively — "Ridge Stone Distillery" and "RIDGE STONE DISTILLERY" are the same value. The sole exception is the GOVERNMENT WARNING: label, which must appear in ALL CAPS and bold per 27 CFR Part 16 § 16.22(a)(2) — flag any case deviation there.
 
 CONFIDENCE SCORING:
 - 0.90–1.00: Field clearly readable, unambiguous match or mismatch
