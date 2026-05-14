@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { ApplicationFieldsSchema } from '@/lib/schemas';
 import { verify, VerificationError } from '@/lib/verify';
+import { logger } from '@/lib/logger';
 import type { ErrorResponse } from '@/types';
 
 // Prototype: JPEG and PNG supported via base64 vision.
@@ -113,17 +114,35 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   // --- Run verification ---
+  const t0 = Date.now();
   try {
     const result = await verify(fields, imageBuffers, mimeTypes);
+    const duration_ms = Date.now() - t0;
+    logger.info('verify.complete', {
+      verification_id: result.metadata.verification_id,
+      beverage_type: fields.beverage_type,
+      overall_status: result.overall_status,
+      duration_ms,
+    });
     return Response.json(result, { status: 200 });
   } catch (err) {
+    const duration_ms = Date.now() - t0;
     if (err instanceof VerificationError) {
+      logger.warn('verify.error', {
+        code: err.code,
+        beverage_type: fields.beverage_type,
+        duration_ms,
+      });
       return errorJson(
         { error: err.message, code: err.code },
         HTTP_STATUS[err.code] ?? 500
       );
     }
-    console.error('[api/verify] Unexpected error:', err);
+    logger.error('verify.unexpected', {
+      beverage_type: fields.beverage_type,
+      duration_ms,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return errorJson(
       {
         error: 'An unexpected error occurred. Please retry or proceed with manual review.',

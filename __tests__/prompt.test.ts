@@ -233,4 +233,32 @@ describe('buildUserMessage()', () => {
       expect(sp).not.toContain('1 Test St');
     }
   });
+
+  it('XML-significant characters in field values are escaped in the user message', () => {
+    const fields: ApplicationFields = {
+      ...base,
+      beverage_type: 'distilled_spirits',
+      brand_name: 'Brands <Best> & Worst',
+      class_type: 'Type "A"',
+    };
+    const content = buildUserMessage(fields, [tinyImage], ['image/jpeg']);
+    const text = (content[0] as { type: 'text'; text: string }).text;
+
+    // < and > must be escaped so they cannot break the XML structure
+    expect(text).toContain('&lt;Best&gt;');
+    // & must be escaped
+    expect(text).toContain('&amp;');
+    // Raw < or > must not appear inside an XML tag value
+    expect(text).not.toContain('<Best>');
+    expect(text).not.toContain('>Worst');
+  });
+
+  it('all three system prompts include the CASE SENSITIVITY POLICY instruction', () => {
+    for (const type of ['distilled_spirits', 'wine', 'malt_beverage'] as const) {
+      const p = buildSystemPrompt(type);
+      expect(p, `${type} prompt missing CASE SENSITIVITY POLICY`).toContain('CASE SENSITIVITY POLICY');
+      expect(p, `${type} prompt missing case-insensitive instruction for brand_name`).toContain('brand_name');
+      expect(p, `${type} prompt must name the GOVERNMENT WARNING: as the case-sensitive exception`).toContain('GOVERNMENT WARNING:');
+    }
+  });
 });

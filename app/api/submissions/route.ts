@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { put } from '@vercel/blob';
 import { ApplicationFieldsSchema } from '@/lib/schemas';
 import { getAllSubmissions, setSubmission } from '@/lib/store';
+import { logger } from '@/lib/logger';
 import type { SubmissionListItem } from '@/types';
 
 const ACCEPTED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
@@ -108,7 +109,11 @@ export async function POST(request: NextRequest): Promise<Response> {
         contentType: entry.type,
       }));
     } catch (err) {
-      console.error('[api/submissions] Blob upload failed:', err);
+      logger.error('submissions.blob_upload_failed', {
+        submission_id: id,
+        image_index: i + 1,
+        error: err instanceof Error ? err.message : String(err),
+      });
       return Response.json(
         { error: 'Image storage is unavailable. Please try again or contact support.', code: 'AI_UNAVAILABLE' },
         { status: 503 }
@@ -130,12 +135,21 @@ export async function POST(request: NextRequest): Promise<Response> {
       image_mimetypes,
     });
   } catch (err) {
-    console.error('[api/submissions] KV write failed:', err);
+    logger.error('submissions.kv_write_failed', {
+      submission_id: id,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return Response.json(
       { error: 'Submission queue is unavailable. Please try again or contact support.', code: 'AI_UNAVAILABLE' },
       { status: 503 }
     );
   }
+
+  logger.info('submissions.received', {
+    submission_id: id,
+    beverage_type: fieldsResult.data.beverage_type,
+    image_count: image_urls.length,
+  });
 
   return Response.json({ id, submitted_at, status: 'pending' }, { status: 201 });
 }

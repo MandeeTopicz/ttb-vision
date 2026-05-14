@@ -3,6 +3,7 @@ import { unzipSync } from 'fflate';
 import { parseCsv } from '@/lib/csv';
 import { verify, VerificationError } from '@/lib/verify';
 import { getRulesetVersion } from '@/lib/rules';
+import { logger } from '@/lib/logger';
 import type { BatchProgressEvent, BatchSummary, BatchLabelResult, ErrorResponse } from '@/types';
 
 // No application-level batch row cap — size is bounded only by OpenAI tier rate limits.
@@ -93,6 +94,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   const modelVersion = process.env.OPENAI_MODEL ?? 'gpt-4o';
   const rulesetVersion = getRulesetVersion();
 
+  logger.info('batch.start', { batch_id: batchId, row_count: rows.length });
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const results: BatchLabelResult[] = [];
@@ -136,6 +139,14 @@ export async function POST(request: NextRequest): Promise<Response> {
           if (status === 'pass') passCount++;
           else flagCount++;
 
+          logger.info('batch.label.complete', {
+            batch_id: batchId,
+            row: rowNum,
+            brand_name: row.brand_name,
+            status,
+            verification_id: verifyResult.metadata.verification_id,
+          });
+
           const labelResult: BatchLabelResult = {
             row: rowNum,
             image_filename,
@@ -152,6 +163,12 @@ export async function POST(request: NextRequest): Promise<Response> {
             err instanceof VerificationError
               ? err.message
               : 'An unexpected error occurred during verification';
+          logger.error('batch.label.failed', {
+            batch_id: batchId,
+            row: rowNum,
+            brand_name: row.brand_name,
+            error: message,
+          });
           const labelResult: BatchLabelResult = {
             row: rowNum,
             image_filename,
@@ -179,6 +196,15 @@ export async function POST(request: NextRequest): Promise<Response> {
         model_version: modelVersion,
         results,
       };
+
+      logger.info('batch.complete', {
+        batch_id: batchId,
+        total_submitted: rows.length,
+        pass_count: passCount,
+        flag_count: flagCount,
+        failed_count: failedCount,
+        not_found_count: notFoundCount,
+      });
 
       controller.enqueue(sseData({ type: 'complete', ...summary }));
       controller.close();

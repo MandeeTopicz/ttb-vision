@@ -5,6 +5,7 @@ import {
   VerificationResponseSchema,
   ErrorResponseSchema,
 } from '@/lib/schemas';
+import type { BatchSummary, BatchLabelResult } from '@/types';
 
 // --- ApplicationFieldsSchema ---
 
@@ -233,5 +234,85 @@ describe('ErrorResponseSchema', () => {
   it('rejects a missing error message', () => {
     const result = ErrorResponseSchema.safeParse({ code: 'TIMEOUT' });
     expect(result.success).toBe(false);
+  });
+});
+
+// --- VerificationResponseSchema — additional edge cases ---
+
+describe('VerificationResponseSchema — edge cases', () => {
+  const validResponse = {
+    overall_status: 'pass',
+    fields: [
+      {
+        field: 'brand_name',
+        status: 'pass',
+        confidence: 0.98,
+        app_value: 'Old Tom Distillery',
+        label_value: 'Old Tom Distillery',
+      },
+    ],
+    compliance: {
+      government_warning_present: true,
+      government_warning_verbatim: true,
+      government_warning_caps_bold: true,
+      abv_format_compliant: true,
+    },
+    metadata: {
+      model_version: 'gpt-4o-2024-08-06',
+      ruleset_version: '1.0.0',
+      timestamp: '2026-05-13T10:00:00Z',
+      verification_id: '550e8400-e29b-41d4-a716-446655440000',
+    },
+  };
+
+  it('rejects a missing fields array', () => {
+    const { fields, ...without } = validResponse;
+    const result = VerificationResponseSchema.safeParse(without);
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts an empty fields array (schema does not enforce non-empty)', () => {
+    const result = VerificationResponseSchema.safeParse({ ...validResponse, fields: [] });
+    expect(result.success).toBe(true);
+  });
+});
+
+// --- BatchSummary / BatchLabelResult — TypeScript shape checks ---
+// BatchSummary and BatchLabelResult are TypeScript interfaces only (no Zod schema).
+// These tests verify the shape is constructable without TypeScript errors.
+
+describe('BatchSummary type shape', () => {
+  it('a valid BatchSummary object satisfies the interface', () => {
+    const result: BatchLabelResult = {
+      row: 1,
+      image_filename: 'label_001.jpg',
+      brand_name: 'Test Brand',
+      status: 'pass',
+    };
+    const summary: BatchSummary = {
+      batch_id: '550e8400-e29b-41d4-a716-446655440001',
+      total_submitted: 1,
+      total_verified: 1,
+      pass_count: 1,
+      flag_count: 0,
+      failed_count: 0,
+      not_found_count: 0,
+      started_at: '2026-05-13T10:00:00Z',
+      completed_at: '2026-05-13T10:01:00Z',
+      ruleset_version: '1.0.0',
+      model_version: 'gpt-4o-2024-08-06',
+      results: [result],
+    };
+    expect(summary.total_submitted).toBe(1);
+    expect(summary.results[0].status).toBe('pass');
+  });
+
+  it('BatchLabelResult status includes all four valid values', () => {
+    const statuses: Array<BatchLabelResult['status']> = ['pass', 'flag_for_review', 'failed', 'image_not_found'];
+    expect(statuses).toHaveLength(4);
+    for (const s of statuses) {
+      const r: BatchLabelResult = { row: 1, image_filename: 'f.jpg', brand_name: 'B', status: s };
+      expect(r.status).toBe(s);
+    }
   });
 });

@@ -157,6 +157,52 @@ Expected output format:
 
 ---
 
+## Observability
+
+### Structured logging
+
+All three API routes emit structured JSON log lines to stdout/stderr. Each line is a single
+JSON object with the following shape:
+
+```json
+{ "ts": "2026-05-13T14:23:01.234Z", "level": "info", "message": "verify.complete", "verification_id": "...", "beverage_type": "distilled_spirits", "overall_status": "pass", "duration_ms": 1842 }
+```
+
+| Log message | Level | Route | Key fields |
+|---|---|---|---|
+| `verify.complete` | info | `/api/verify` | `verification_id`, `beverage_type`, `overall_status`, `duration_ms` |
+| `verify.error` | warn | `/api/verify` | `code`, `beverage_type`, `duration_ms` |
+| `verify.unexpected` | error | `/api/verify` | `beverage_type`, `duration_ms`, `error` |
+| `submissions.received` | info | `/api/submissions` | `submission_id`, `beverage_type`, `image_count` |
+| `submissions.blob_upload_failed` | error | `/api/submissions` | `submission_id`, `image_index`, `error` |
+| `submissions.kv_write_failed` | error | `/api/submissions` | `submission_id`, `error` |
+| `batch.start` | info | `/api/batch` | `batch_id`, `row_count` |
+| `batch.label.complete` | info | `/api/batch` | `batch_id`, `row`, `brand_name`, `status`, `verification_id` |
+| `batch.label.failed` | error | `/api/batch` | `batch_id`, `row`, `brand_name`, `error` |
+| `batch.complete` | info | `/api/batch` | `batch_id`, `total_submitted`, `pass_count`, `flag_count`, `failed_count`, `not_found_count` |
+
+### Reading logs on Vercel
+
+Logs are available in the Vercel dashboard under the project → **Logs** tab, or via the CLI:
+
+```bash
+vercel logs --follow
+```
+
+Filter for errors only: in the dashboard, use the **Error** level filter. In the CLI, pipe
+through `jq`: `vercel logs | jq 'select(.level == "error")'`.
+
+### What to watch
+
+- **`duration_ms` on `verify.complete`**: p95 must stay below 5,000 ms. A sustained increase
+  indicates OpenAI latency degradation or model changes.
+- **`verify.error` with `code: AI_UNAVAILABLE` or `TIMEOUT`**: spikes indicate OpenAI
+  availability issues.
+- **`batch.label.failed` count relative to `row_count`**: a high ratio indicates a systemic
+  problem (rate limit, bad ZIP, malformed CSV rows).
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
