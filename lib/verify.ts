@@ -45,7 +45,7 @@ export async function verify(
   }
 
   const model = process.env.OPENAI_MODEL ?? 'gpt-4o';
-  const maxTokens = parseInt(process.env.OPENAI_MAX_TOKENS ?? '2000', 10);
+  const maxTokens = parseInt(process.env.OPENAI_MAX_TOKENS ?? '2500', 10);
   const timeoutMs = parseInt(process.env.OPENAI_TIMEOUT_MS ?? '15000', 10);
 
   const client = new OpenAI({ apiKey, maxRetries: 0, timeout: timeoutMs });
@@ -64,6 +64,7 @@ export async function verify(
       const response = await client.chat.completions.create({
         model,
         max_tokens: maxTokens,
+        temperature: 0, // deterministic output — same label must produce same result every run
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
