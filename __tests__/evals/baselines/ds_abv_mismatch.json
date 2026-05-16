@@ -1,0 +1,59 @@
+{
+  "overall_status": "flag_for_review",
+  "fields": [
+    {
+      "field": "brand_name",
+      "status": "pass",
+      "confidence": 1,
+      "app_value": "Ridge Stone Distillery",
+      "label_value": "RIDGE STONE DISTILLERY",
+      "note": ""
+    },
+    {
+      "field": "class_type",
+      "status": "pass",
+      "confidence": 1,
+      "app_value": "Kentucky Straight Bourbon Whiskey",
+      "label_value": "Kentucky Straight Bourbon Whiskey",
+      "note": ""
+    },
+    {
+      "field": "abv",
+      "status": "flag",
+      "confidence": 1,
+      "app_value": "99% Alc./Vol.",
+      "label_value": "45% Alc./Vol. (90 Proof)",
+      "note": "ABV percentage on the label does not match the application data."
+    },
+    {
+      "field": "net_contents",
+      "status": "pass",
+      "confidence": 1,
+      "app_value": "750 mL",
+      "label_value": "750 mL",
+      "note": ""
+    },
+    {
+      "field": "bottler_name_address",
+      "status": "pass",
+      "confidence": 1,
+      "app_value": "Ridge Stone Distilling Co., 456 Barrel Lane, Louisville, KY 40201",
+      "label_value": "Ridge Stone Distilling Co., 456 Barrel Lane, Louisville, KY 40201",
+      "note": ""
+    }
+  ],
+  "compliance": {
+    "government_warning_present": true,
+    "government_warning_verbatim": true,
+    "government_warning_caps_bold": true,
+    "government_warning_note": "",
+    "abv_format_compliant": true,
+    "abv_format_note": ""
+  },
+  "metadata": {
+    "model_version": "1.0",
+    "ruleset_version": "1.0.0",
+    "timestamp": "2026-05-16T22:21:34.432Z",
+    "verification_id": "1f71bb85-a8b0-4884-9ba5-5d7d554a29c8"
+  }
+}
