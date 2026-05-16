@@ -26,7 +26,8 @@ function isTimeoutError(err: unknown): boolean {
     err instanceof Error &&
     (err.name === 'APIConnectionTimeoutError' ||
       err.name === 'AbortError' ||
-      err.message.toLowerCase().includes('timeout'))
+      err.message.toLowerCase().includes('timeout') ||
+      err.message.toLowerCase().includes('timed out'))
   );
 }
 

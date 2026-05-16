@@ -6,7 +6,7 @@
  * Requires: __tests__/fixtures/test-label-clean.jpg — a real JPEG label image
  *
  * Skips silently when OPENAI_API_KEY is absent so CI never fails.
- * Hard requirement: p95 ≤ 20,000ms (GPT-4o vision calls typically return in 11–14s).
+ * Hard requirement: p95 ≤ 5,000ms (PRD §5).
  *
  * A 3s inter-run delay is applied between calls to avoid TPM exhaustion on Tier 1.
  */
@@ -15,14 +15,15 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { verify } from '@/lib/verify';
+import { buildSystemPrompt } from '@/lib/prompt';
 import type { ApplicationFields } from '@/types';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const RUNS = 5;
-const P95_LIMIT_MS = 20_000;
+const RUNS = 20;
+const P95_LIMIT_MS = 5_000;
 const INTER_RUN_DELAY_MS = 3_000; // 3s between runs; vision calls are token-heavy
-const TIMEOUT_MS = RUNS * (30_000 + INTER_RUN_DELAY_MS);
+const TIMEOUT_MS = RUNS * (15_000 + INTER_RUN_DELAY_MS);
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -65,13 +66,23 @@ function formatMs(ms: number): string {
 
 describe('Latency Benchmark — verify() single label', () => {
   it(
-    `p95 ≤ ${P95_LIMIT_MS.toLocaleString()}ms over ${RUNS} real API calls`,
+    `p95 ≤ 5,000ms over 20 real API calls`,
     async () => {
       if (!process.env.OPENAI_API_KEY) {
         console.log('\n  [bench] OPENAI_API_KEY not set — skipping latency benchmark.\n');
         return;
       }
 
+      const systemPrompt = buildSystemPrompt(fields.beverage_type);
+      const base64Bytes = Math.ceil(imageBuffer.length * 4 / 3);
+
+      console.log(`\n  [bench] Diagnostic info:`);
+      console.log(`    model            : ${process.env.OPENAI_MODEL ?? 'gpt-4o'}`);
+      console.log(`    timeout_ms       : ${process.env.OPENAI_TIMEOUT_MS ?? '15000 (default)'}`);
+      console.log(`    max_tokens       : ${process.env.OPENAI_MAX_TOKENS ?? '2500 (default)'}`);
+      console.log(`    system prompt    : ${systemPrompt.length.toLocaleString()} chars`);
+      console.log(`    image file       : ${imageBuffer.length.toLocaleString()} bytes (${(imageBuffer.length / 1024).toFixed(1)} KB)`);
+      console.log(`    image base64     : ${base64Bytes.toLocaleString()} bytes (${(base64Bytes / 1024).toFixed(1)} KB)`);
       console.log(`\n  [bench] Starting ${RUNS} runs against ${process.env.OPENAI_MODEL ?? 'gpt-4o'}…`);
 
       const times: number[] = [];
@@ -88,8 +99,10 @@ describe('Latency Benchmark — verify() single label', () => {
         } catch (err) {
           const elapsed = Date.now() - start;
           const msg = err instanceof Error ? err.message : String(err);
-          errors.push(`Run ${i + 1}: ${msg}`);
-          console.log(`  [bench] run ${String(i + 1).padStart(2, '0')}/${RUNS}  ${formatMs(elapsed).padStart(7)}  ✗ ERROR: ${msg}`);
+          const name = err instanceof Error ? err.name : 'UnknownError';
+          const status = err instanceof Error && 'status' in err ? ` [HTTP ${(err as Record<string, unknown>)['status']}]` : '';
+          errors.push(`Run ${i + 1}: ${name}${status}: ${msg}`);
+          console.log(`  [bench] run ${String(i + 1).padStart(2, '0')}/${RUNS}  ${formatMs(elapsed).padStart(7)}  ✗ ${name}${status}: ${msg}`);
         }
         await new Promise((resolve) => setTimeout(resolve, INTER_RUN_DELAY_MS));
       }

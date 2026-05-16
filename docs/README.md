@@ -150,26 +150,27 @@ OPENAI_API_KEY=sk-... npm run bench
 
 The benchmark uses a 3s inter-run delay to stay within OpenAI Tier 1 token limits.
 
-### Results — 2026-05-14 (post prompt optimization)
+### Results — 2026-05-16 (compressed fixture, 20-run benchmark)
 
-Fixture: `test-label-clean.jpg` (358 KB, 600×327 px, JPEG quality 75)
-Model: `gpt-4o` · Runs: 5 · Tier 1
+Fixture: `test-label-clean.jpg` (30 KB, 400×218 px) — 1 GPT-4o vision tile (255 tokens)
+Model: `gpt-4o` · max_tokens: 2000 · Runs: 20 · Tier 1
 
 ```
 ── Latency Results ──────────────────────────
-   Successful runs : 5/5
-   p50             : 7,422ms
-   p95             : 8,772ms  ✓ PASS   (must be ≤ 20,000ms)
-   p99             : 8,772ms
-   avg             : 7,345ms
-   min             : 6,390ms
-   max             : 8,772ms
+   Successful runs : 20/20
+   p50             : 3,964ms
+   p95             : 4,933ms  ✓ PASS   (must be ≤ 5,000ms)
+   p99             : 4,983ms
+   avg             : 4,079ms
+   min             : 3,503ms
+   max             : 4,983ms
 ─────────────────────────────────────────────
 ```
 
-**Hard requirement:** p95 ≤ 20,000 ms. GPT-4o vision calls (image + system prompt)
-typically return in 6–9 seconds with a properly compressed image. Production on Azure
-OpenAI Service with dedicated capacity will be significantly faster.
+**Hard requirement:** p95 ≤ 5,000 ms. Compressing the fixture to under 512px on both
+dimensions reduces the image to a single GPT-4o vision tile and halves the base64 payload,
+bringing p50 to ~4s. Production on Azure OpenAI Service with dedicated capacity will be
+significantly faster.
 
 ---
 

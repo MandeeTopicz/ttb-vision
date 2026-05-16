@@ -6,6 +6,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['**/*.bench.ts'],
+    setupFiles: ['./__tests__/setup-bench.ts'],
   },
   resolve: {
     alias: {
