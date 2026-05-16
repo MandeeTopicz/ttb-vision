@@ -249,6 +249,37 @@ Every response from GPT-4o is parsed and validated against `VerificationResponse
 | Low | 0.50–0.69 | Field partially obscured or ambiguous | Manually verify |
 | Unable to Verify | 0.00–0.49 | Field cannot be reliably read | Obtain a better image |
 
+### LLM Eval Harness
+
+The unit test suite (`npm test`) mocks OpenAI entirely — it validates schemas, prompt
+construction, error handling, and CSV parsing, but never exercises the model. The latency
+benchmark (`npm run bench`) hits the real API but only asserts timing. Neither tests
+whether GPT-4o makes correct compliance calls.
+
+The eval harness (`npm run eval`, `__tests__/evals/eval.ts`) addresses this with three
+layers of checks on real API responses:
+
+**Behavioral assertions:** each case submits one obviously wrong field value and asserts
+the model flags that exact field. Submitting `"XXXXXXXX_INVALID_BRAND_9999"` as the brand
+name must always produce `status: 'flag'` at `confidence >= 0.85`. This is deterministic
+regardless of image content — any readable label will produce a mismatch against a nonsense
+brand name. This approach avoids requiring hand-crafted synthetic label images while still
+producing meaningful signal about model behavior.
+
+**Calibration invariants:** applied to every field in every response. The `ttb_rules.json`
+confidence thresholds define that `unable_to_verify` requires `confidence < 0.50` and
+`pass`/`flag` requires `confidence >= 0.50`. The eval asserts these hold on every run and
+checks that `overall_status` agrees with the field and compliance results.
+
+**Regression detection:** `npm run eval:capture` saves the full model response for each
+case to `__tests__/evals/baselines/`. Future runs compare `overall_status` and per-field
+`status` against those baselines. Drift surfaces immediately, catching prompt changes,
+ruleset updates, or model version changes that alter verification behavior.
+
+The baseline JSONs are committed to the repository. They must be updated (via
+`eval:capture`) and recommitted whenever an intentional change is made to the prompt,
+ruleset, or model configuration.
+
 ### Triage Model
 
 TTB Vision does not eliminate human review — it compresses it. Labels with no issues get a fast, documented sign-off. Labels with problems surface exactly the fields that need attention rather than requiring the agent to inspect the entire label manually. The efficiency gain is in triage, not in removing the agent from the loop.
@@ -515,6 +546,27 @@ A single batch CSV can contain rows with different `beverage_type` values. The c
 
 ## Known Improvements
 
+### LLM eval coverage gaps
+
+The current eval harness covers five single-label mismatch cases and one regression baseline,
+all using one distilled spirits fixture (`test-label-clean.jpg`). Gaps to address before
+production:
+
+- **Wine and malt beverage cases** — no eval cases exist for the other two beverage types.
+  At minimum one mismatch case per beverage type is needed to confirm ruleset routing.
+- **Import label cases** — no eval cases test the `is_import: true` path or the
+  `country_of_origin` field.
+- **Fuzzy match cases** — no eval cases test near-matches (case differences, abbreviations,
+  punctuation) to confirm the model flags rather than auto-passes them.
+- **Calibration under image degradation** — no cases test low-confidence responses.
+  A degraded or partial-obscure label image should produce `unable_to_verify` with
+  `confidence < 0.50`. This requires adding degraded fixture images.
+- **Multi-image cases** — the verify route accepts up to 3 images. No eval case exercises
+  multi-panel label submissions.
+
 ### Batch testing approach
 
-The current implementation uses CSV + ZIP upload for batch input with manual result review. A more rigorous testing approach would include a `manifest.json` per batch defining expected verification outcomes per label, enabling automated accuracy validation rather than manual review. Recommended for production QA pipeline.
+The batch flow uses CSV + ZIP upload with manual result review. A more rigorous approach
+would include a `manifest.json` per batch defining expected verification outcomes per label,
+enabling automated accuracy validation rather than manual review. Recommended for the
+production QA pipeline.

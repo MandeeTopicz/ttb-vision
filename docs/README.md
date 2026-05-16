@@ -65,9 +65,11 @@ cp .env.local.example .env.local
 vercel env pull .env.local
 
 npm install
-npm run dev        # http://localhost:3000
-npm test           # unit tests
-npm run bench      # latency benchmark (requires OPENAI_API_KEY)
+npm run dev          # http://localhost:3000
+npm test             # unit tests
+npm run bench        # latency benchmark (requires OPENAI_API_KEY)
+npm run eval         # LLM output evals (requires OPENAI_API_KEY)
+npm run eval:capture # run evals + write regression baselines to __tests__/evals/baselines/
 ```
 
 ---
@@ -134,6 +136,54 @@ Azure infrastructure, with no TTL and full audit trail. See `docs/SCALING.md §3
 
 The prototype has no authentication. Any user who has the URL can access any route, including
 the agent queue. Production requires SSO/Active Directory integration. See `docs/SCALING.md §2`.
+
+---
+
+## LLM Evals
+
+`__tests__/evals/eval.ts` tests the actual GPT-4o output — not mocked responses. The unit
+suite (`npm test`) mocks OpenAI entirely, which validates the plumbing but not whether the
+model makes correct compliance calls. The eval harness fills that gap.
+
+Run with: `npm run eval` (skips silently if `OPENAI_API_KEY` is absent)
+
+### Three layers of checks per case
+
+**1. Behavioral assertions** — each case submits one obviously wrong field value and asserts
+the model flags that specific field. Example: submitting `"XXXXXXXX_INVALID_BRAND_9999"` as
+the brand name against any real label must always produce `status: 'flag'` with
+`confidence >= 0.85`. These assertions are deterministic regardless of image content.
+
+**2. Calibration invariants** — applied to every field in every response:
+- `status: 'unable_to_verify'` requires `confidence < 0.50` (per `ttb_rules.json` thresholds)
+- `status: 'pass'` or `'flag'` requires `confidence >= 0.50`
+- `overall_status: 'pass'` is invalid if any field is flagged or any compliance check fails
+- `overall_status: 'flag_for_review'` is invalid if no fields are flagged and all compliance checks pass
+
+**3. Regression detection** — once `npm run eval:capture` has been run and the baseline
+JSONs in `__tests__/evals/baselines/` committed, every subsequent eval run compares
+`overall_status` and per-field `status` against those baselines. Any drift in model output
+surfaces immediately, catching prompt changes or model version changes.
+
+### Cases
+
+| Case ID | What it tests |
+|---|---|
+| `ds_brand_mismatch` | Brand name clearly wrong → `brand_name: flag` |
+| `ds_abv_mismatch` | ABV clearly wrong (99%) → `abv: flag` |
+| `ds_net_contents_mismatch` | Net contents clearly wrong (5.00 L) → `net_contents: flag` |
+| `ds_class_type_mismatch` | Class/type clearly wrong → `class_type: flag` |
+| `ds_bottler_mismatch` | Bottler name clearly wrong → `bottler_name_address: flag` |
+| `ds_baseline` | Correct COLA fields → captures regression baseline, all fields expected to pass |
+
+All cases use `__tests__/fixtures/test-label-clean.jpg` (Ridge Stone Distillery,
+Kentucky Straight Bourbon Whiskey, 45% Alc./Vol., 750 mL).
+
+### Baseline capture workflow
+
+Run `npm run eval:capture` once after any intentional change to the prompt, ruleset, or
+model. This overwrites the baseline JSONs. Commit the updated baselines alongside the change
+so the regression anchor reflects the new expected behavior.
 
 ---
 

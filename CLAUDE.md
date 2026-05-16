@@ -66,7 +66,13 @@ ttb-vision/
 ├── __tests__/
 │   ├── verify.test.ts
 │   ├── schemas.test.ts
-│   └── latency.bench.ts            # Latency benchmark — p95 must be ≤ 20,000ms
+│   ├── latency.bench.ts            # Latency benchmark — p95 must be ≤ 20,000ms
+│   └── evals/
+│       ├── types.ts                # EvalCase and EvalCaseResult types
+│       ├── cases.ts                # Golden test cases (mismatch + regression baseline)
+│       ├── setup-eval.ts           # Loads .env.local, extends timeout
+│       ├── eval.ts                 # Eval runner — behavioral, calibration, regression checks
+│       └── baselines/              # Committed baseline JSONs — run eval:capture to update
 ├── docs/
 │   ├── README.md
 │   ├── APPROACH_AND_ASSUMPTIONS.md
