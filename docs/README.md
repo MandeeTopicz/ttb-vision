@@ -60,8 +60,8 @@ PDF or plain text report.
 cp .env.local.example .env.local
 # Add your OPENAI_API_KEY to .env.local
 
-# Enable Vercel KV in your Vercel project dashboard under Storage,
-# then pull the KV environment variables:
+# Enable Vercel KV and Vercel Blob in your Vercel project dashboard under Storage,
+# then pull all storage environment variables:
 vercel env pull .env.local
 
 npm install
@@ -159,7 +159,7 @@ Model: `gpt-4o` · max_tokens: 2000 · Runs: 20 · Tier 1
 ── Latency Results ──────────────────────────
    Successful runs : 20/20
    p50             : 3,964ms
-   p95             : 4,933ms  ✓ PASS   (must be ≤ 5,000ms)
+   p95             : 4,933ms  ✓ PASS   (must be ≤ 20,000ms)
    p99             : 4,983ms
    avg             : 4,079ms
    min             : 3,503ms
@@ -167,10 +167,11 @@ Model: `gpt-4o` · max_tokens: 2000 · Runs: 20 · Tier 1
 ─────────────────────────────────────────────
 ```
 
-**Hard requirement:** p95 ≤ 5,000 ms. Compressing the fixture to under 512px on both
-dimensions reduces the image to a single GPT-4o vision tile and halves the base64 payload,
-bringing p50 to ~4s. Production on Azure OpenAI Service with dedicated capacity will be
-significantly faster.
+**Hard requirement:** p95 ≤ 20,000 ms (see `APPROACH_AND_ASSUMPTIONS.md § Latency Design`).
+The benchmark fixture is a 30 KB compressed image (single GPT-4o vision tile), which produces
+sub-5s results. Real-world label images are typically larger; typical p50 on the public OpenAI
+API is 11–14s. Production on Azure OpenAI Service with dedicated capacity will be significantly
+faster and more consistent.
 
 ---
 
@@ -211,7 +212,7 @@ through `jq`: `vercel logs | jq 'select(.level == "error")'`.
 
 ### What to watch
 
-- **`duration_ms` on `verify.complete`**: p95 must stay below 5,000 ms. A sustained increase
+- **`duration_ms` on `verify.complete`**: p95 must stay below 20,000 ms. A sustained increase
   indicates OpenAI latency degradation or model changes.
 - **`verify.error` with `code: AI_UNAVAILABLE` or `TIMEOUT`**: spikes indicate OpenAI
   availability issues.

@@ -6,15 +6,52 @@ This document records data handling practices, regulatory citations, provider de
 
 ## Data Handling
 
-TTB Vision is **fully stateless**. No application data is persisted at any point in the verification lifecycle.
+TTB Vision implements a three-party workflow (vendor → queue → agent). The submission queue requires
+short-term persistence to hold submissions between vendor upload and agent review. This section
+documents exactly what is stored, where, and for how long.
 
-- **Label images** — uploaded for the duration of a single request and held in memory only. Never written to disk, database, cache, or blob storage. The image buffer is garbage-collected when the request completes.
-- **Application field data** — provided by the agent in the request body. Passed to the AI prompt as part of that request and not retained after the response is returned.
-- **Verification results** — held in React state in the agent's browser session only. Cleared when the agent navigates away or starts a new verification. Never sent to any server after the initial response.
-- **Browser storage** — no application data is written to `localStorage`, `sessionStorage`, cookies, or the browser cache. The agent's session is entirely ephemeral.
-- **No database** — the prototype has no database of any kind. There is no verification history, no user record, and no stored configuration beyond `config/ttb_rules.json` (which contains only regulatory rules, not agent or label data).
+### What is stored (prototype)
 
-In the event of a network error or server crash mid-verification, no partial data is retained on the server.
+- **Label images** — uploaded via `POST /api/submissions`. Stored in **Vercel Blob** (private container,
+  public access URLs). Each image is referenced by a stable URL tied to the submission ID. Images are
+  not embedded in the queue record.
+- **Application field data** — stored in **Vercel KV** (Redis) as part of the `Submission` record, keyed
+  by submission UUID. Includes all vendor-supplied COLA fields, image URLs, image MIME types, submission
+  timestamp, and status.
+- **Verification outcome** — after the agent runs AI verification, the overall result
+  (`pass` or `flag_for_review`) is written back to the KV submission record via `PATCH /api/submissions/[id]`.
+- **Agent determination and notes** — after the agent records a final determination (`approved`, `rejected`,
+  or `resubmission_requested`), the determination value and any notes are written to the KV submission record.
+- **Browser state** — detailed AI verification results (`VerificationResponse`) are held in React state in
+  the agent's browser only. They are never sent to any server after the initial `/api/verify` response.
+
+### Retention and expiry
+
+All submission records in Vercel KV are created with a **24-hour TTL**. After 24 hours, the record
+automatically expires and is no longer accessible. Images in Vercel Blob are not independently purged;
+they become orphaned once the KV record expires. For the prototype this is acceptable — in production,
+a retention policy aligned with the applicable federal records schedule is required (see `SCALING.md §3`).
+
+### What is NOT stored
+
+- **No AI prompt or completion text** — the full prompt and GPT-4o response are not logged or stored.
+  Only the structured `overall_status` outcome is written back to the submission record.
+- **No browser storage** — no application data is written to `localStorage`, `sessionStorage`, cookies,
+  or the browser cache.
+- **No analytics or telemetry** — structured log lines (see `docs/README.md § Observability`) are written
+  to stdout only and contain no PII beyond what is in the COLA application fields.
+- **No user identity** — the prototype has no authentication. No agent identity is recorded. In production,
+  agent identity from Treasury Active Directory SSO is required for every verification record.
+
+### Individual verifications are stateless
+
+The `/api/verify` route itself is fully stateless. It receives the fields and images in the request body,
+calls GPT-4o, validates the response, and returns it. Nothing from the verification is written to any
+store by the verify route. The only persistence in the verification workflow occurs in `/api/submissions`
+(which stores the initial submission) and `PATCH /api/submissions/[id]` (which updates the outcome and
+determination after the agent acts).
+
+In the event of a network error or server crash during `/api/verify`, no partial data is retained on the server.
 
 ---
 

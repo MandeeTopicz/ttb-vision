@@ -52,14 +52,14 @@ Browser (React client)
 
 1. **Vendor fills form** — `VerificationForm` collects all application fields and up to 3 label images. Client-side validation runs on blur and submit.
 2. **Client submits** — `FormData` is `POST`ed to `/api/submissions` with `fields` (JSON string) and `images` (file uploads).
-3. **API route validates** — `ApplicationFieldsSchema` (Zod) parses the fields. Images are validated for MIME type and size. Images are base64-encoded and stored in the server-side Map (`lib/store.ts`) with a UUID key.
+3. **API route validates** — `ApplicationFieldsSchema` (Zod) parses the fields. Images are validated for MIME type and size. Each image is uploaded to **Vercel Blob** and the resulting public URL is stored alongside the submission. Application fields, image URLs, and image MIME types are written to **Vercel KV** under the submission UUID with a 24-hour TTL.
 4. **Vendor sees confirmation only** — The response is `{ id, submitted_at, status: 'pending' }`. The vendor's browser shows a confirmation message. No AI output, no pass/fail, no compliance findings are returned to the vendor at any point.
 
 **Agent review (`/queue` → `/queue/[id]` → `POST /api/verify`):**
 
 5. **Agent opens queue** — `GET /api/submissions` returns all submissions as `SubmissionListItem[]` sorted by date. The agent sees brand name, beverage type, submitted date, and status.
 6. **Agent opens submission** — `GET /api/submissions/[id]` returns the full `Submission` record including stored base64 images. The agent sees the vendor's fields and images side by side. No AI results are shown yet.
-7. **Agent triggers AI** — The agent clicks "Run Verification." The client converts the stored base64 images back to `File` objects, builds a `FormData`, and `POST`s to `/api/verify`.
+7. **Agent triggers AI** — The agent clicks "Run Verification." The client fetches each image from its Vercel Blob URL (`blobUrlToFile()`), creates `File` objects, builds a `FormData`, and `POST`s to `/api/verify`.
 8. **Ruleset loaded** — `getRuleset(beverage_type)` reads `config/ttb_rules.json` and returns the correct mandatory-fields list. Ruleset is never inferred from the label — it is always driven by the `beverage_type` field.
 9. **Prompt constructed** — `buildSystemPrompt()` embeds the government warning rules, mandatory fields for the selected beverage type, fuzzy match policy, and confidence scoring definitions. `buildUserMessage()` wraps all vendor-supplied field values in XML tags and appends base64-encoded images.
 10. **GPT-4o called** — `verify()` sends the system prompt and user message to OpenAI. Rate-limit errors are retried with exponential backoff (1 s, 2 s, 4 s, max 3 retries). Timeout errors surface as `TIMEOUT`.
@@ -88,9 +88,9 @@ Browser (React client)
 ### Prototype Queue Storage
 | | |
 |---|---|
-| **Options** | Server-side in-memory Map; Vercel KV (Redis); external database (Azure SQL, PostgreSQL) |
-| **Choice** | Vercel KV (Redis-based key-value store, built into Vercel) |
-| **Rationale** | An in-memory Map does not persist across Vercel serverless function invocations — each request may hit a different instance with an empty Map, making the queue invisible to agents. A full database (Azure SQL, PostgreSQL) adds infrastructure complexity out of scope for the prototype. Vercel KV is the right fit: it is built into the Vercel platform, requires no separate infrastructure, has a free tier, and persists across serverless invocations. Submissions are stored with a 24-hour TTL, keeping the store clean without manual purging and making the ephemeral nature of the prototype explicit. The production path is Azure SQL Database (FedRAMP authorized) on TTB's existing Azure infrastructure. See `SCALING.md §3`. |
+| **Options** | Server-side in-memory Map; Vercel KV (Redis) + Vercel Blob; external database (Azure SQL, PostgreSQL) |
+| **Choice** | Vercel KV for submission records + Vercel Blob for label images |
+| **Rationale** | An in-memory Map does not persist across Vercel serverless function invocations — each request may hit a different instance with an empty Map, making the queue invisible to agents. A full database (Azure SQL, PostgreSQL) adds infrastructure complexity out of scope for the prototype. Vercel KV is the right fit for the submission metadata: it is built into the Vercel platform, requires no separate infrastructure, has a free tier, and persists across serverless invocations. Label images are stored in Vercel Blob because embedding base64-encoded images in KV records would exceed KV's per-key size limits for larger label images; Blob is designed for binary payloads. Submissions are stored with a 24-hour TTL in KV, keeping the store clean without manual purging and making the ephemeral nature of the prototype explicit. The production path is Azure SQL Database + Azure Blob Storage (both FedRAMP authorized) on TTB's existing Azure infrastructure. See `SCALING.md §3`. |
 
 ### Delivery Format
 | | |
@@ -151,9 +151,9 @@ Browser (React client)
 ### State and Persistence
 | | |
 |---|---|
-| **Options** | Stateless in-memory only, database, browser storage |
-| **Choice** | Fully stateless — no persistence anywhere |
-| **Rationale** | Label images and COLA application data are sensitive. Storing them introduces data retention obligations and security surface area that are out of scope for the prototype. Every verification is fire-and-forget: data lives only in the request/response cycle and is never written to disk, database, `localStorage`, `sessionStorage`, or cookies. |
+| **Options** | Stateless in-memory only, Vercel KV + Blob, database |
+| **Choice** | Submission queue persists in Vercel KV (24-hour TTL) + Vercel Blob for images. Individual AI verifications are stateless. |
+| **Rationale** | The three-party workflow requires that a submission survive from vendor upload until an agent reviews it — which may not happen in the same request or even within seconds. Short-term persistence in Vercel KV and Vercel Blob is the minimum necessary. The 24-hour TTL limits the retention window to what the prototype actually needs and makes the ephemeral nature explicit. The `/api/verify` route itself remains stateless: it receives data in the request body, calls GPT-4o, and returns the result without writing anything. No `localStorage`, `sessionStorage`, or cookies contain application data. The production path moves to Azure SQL + Azure Blob Storage with a federally compliant retention policy (see `SCALING.md §3`). |
 
 ### Beverage Type Selection
 | | |

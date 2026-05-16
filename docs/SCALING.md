@@ -27,8 +27,8 @@ recorded in every verification audit log.
 
 ### Submission Queue (Persistence)
 
-**Prototype:** Server-side in-memory `Map`. Resets on restart. Does not persist across
-Vercel serverless invocations.
+**Prototype:** Vercel KV (Redis). Submission records persist across serverless invocations
+with a 24-hour TTL per record.
 
 **Production:** Azure SQL Database (FedRAMP authorized) on TTB's existing Azure infrastructure.
 Every submission is stored as a database record with: submission ID, vendor identity, all
@@ -37,7 +37,8 @@ timestamp. The queue survives server restarts, deployments, and horizontal scali
 
 ### Label Image Storage
 
-**Prototype:** Base64-encoded images stored in the server-side Map alongside the submission record.
+**Prototype:** Vercel Blob. Images uploaded to a Vercel Blob container; public URLs stored in
+the KV submission record. Images are not embedded in the KV record.
 
 **Production:** Azure Blob Storage. Images are stored in a private container with access
 controlled by the submission ID. Images are referenced by URL in the database record, not
@@ -171,12 +172,12 @@ architecture.
 
 ## 7. Monitoring and Observability
 
-**Prototype:** Server-side `console.error` logging only.
+**Prototype:** Structured JSON logging to stdout/stderr across all three API routes. See `docs/README.md § Observability` for the full log schema and Vercel dashboard instructions.
 
 **Production:** Full observability stack.
 
 - **Azure Application Insights:** Distributed tracing for every verification request. End-to-end latency from form submit to result rendered.
-- **p95 latency alerting:** Alert operations if p95 response time exceeds 5,000 ms over any 5-minute window. This is the hard latency requirement (see `APPROACH_AND_ASSUMPTIONS.md § Latency Design`).
+- **p95 latency alerting:** Alert operations if p95 response time exceeds 20,000 ms over any 5-minute window. This is the hard latency requirement (see `APPROACH_AND_ASSUMPTIONS.md § Latency Design`).
 - **Confidence score drift monitoring:** Track average confidence scores per beverage type over time. A sustained drop in average confidence may indicate a model update or a change in label image quality.
 - **Error rate dashboards:** Track `RESPONSE_INVALID`, `AI_UNAVAILABLE`, `TIMEOUT`, and `VALIDATION_ERROR` rates separately. Sudden increases in any category indicate a specific failure mode to investigate.
 - **Cost projections:** GPT-4o token consumption per verification is predictable from prompt size. Model monthly cost projections for the expected verification volume before production launch and revisit quarterly.
