@@ -37,7 +37,7 @@ export const VerificationMetadataSchema = z.object({
   model_version: z.string(),
   ruleset_version: z.string(),
   timestamp: z.string(),
-  verification_id: z.string(), // overwritten by verify.ts — don't enforce UUID format from AI
+  verification_id: z.string().uuid(),
 });
 
 export const VerificationResponseSchema = z.object({
